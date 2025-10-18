@@ -28,4 +28,22 @@ jobs:
       uses: RonaldPhilipsen/unnamed_versioning_tool@SHA256 # vX.Y.Z
 ```
 
-That's it,
+### providing build metadata
+
+If you want to provide build metadata to include in the versioning you can do that using the `build-metadata` input
+
+```yaml
+jobs:
+  unnamed_versioning_tool:
+    name: unnamed_versioning_tool
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to be able to push commits
+    outputs:
+      version: ${{ steps.unnamed_versioning_tool.outputs.version }}
+    steps:
+      name: unnamed_versioning_tool
+      uses: RonaldPhilipsen/unnamed_versioning_tool@SHA256 # vX.Y.Z
+      with: 
+        build-metadata: ${{ github.sha }}
+```
