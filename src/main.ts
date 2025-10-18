@@ -141,6 +141,24 @@ export async function run() {
     core.setOutput("tag", new_version.as_tag());
     core.setOutput("version", new_version.toString());
     core.setOutput("version-pep-440", new_version.as_pep_440());
+    // Write a concise job summary for GitHub Actions UI (GITHUB_STEP_SUMMARY)
+    try {
+      const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+      if (summaryPath) {
+        const fs = await import("fs/promises");
+        const lines = [
+          `### Versioneer summary`,
+          `- previous: ${last_release_version.toString()}`,
+          `- new: ${new_version.toString()} (${new_version.as_tag()})`,
+          `- pep-440: ${new_version.as_pep_440()}`,
+          `- impact: ${Impact[impact] ?? String(impact)}`,
+        ];
+        await fs.appendFile(summaryPath, lines.join("\n") + "\n");
+        core.info(`Wrote job summary to ${summaryPath}`);
+      }
+    } catch (err) {
+      core.debug(`Failed to write job summary: ${String(err)}`);
+    }
   } catch (err) {
     core.setFailed(String(err));
   }
