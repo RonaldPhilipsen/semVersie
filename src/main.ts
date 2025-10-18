@@ -9,31 +9,41 @@ import {
 import { Impact, SemanticVersion } from "./semver.js";
 import { getConventionalImpact } from "./conventional_commits.js";
 
-export async function getImpactFromGithub(pr: PullRequest, token: string): Promise<Impact | undefined> {
+export type ImpactResult = {
+  prImpact?: Impact;
+  commitImpacts: Impact[];
+  maxCommitImpact?: Impact;
+  finalImpact?: Impact;
+  warning?: string;
+};
+
+export async function getImpactFromGithub(pr: PullRequest, token: string): Promise<ImpactResult> {
   const pr_impact = getConventionalImpact(pr.title, pr.body);
   core.info(`Determined impact from Pull request: ${String(pr_impact)}`);
   const commits = await getPrCommits(token);
 
-  var commit_impacts: Impact[] = [];
+  const commit_impacts: Impact[] = [];
   // Parse each commit title
   for (const commit of commits) {
     const commit_impact = getConventionalImpact(commit.title, commit.body);
     core.debug(`Commit ${commit.sha} title: ${commit.title}`);
     core.debug(`Determined impact from commit: ${String(commit_impact)}`);
-    if (commit_impact) {
+    if (commit_impact !== undefined) {
       commit_impacts.push(commit_impact);
     }
   }
 
-  const max_commit_impact = Math.max(...commit_impacts) as Impact;
+  const max_commit_impact = commit_impacts.length > 0 ? (Math.max(...commit_impacts) as Impact) : undefined;
   core.info(`Maximum impact from commits: ${String(max_commit_impact)}`);
 
   let final_impact: Impact | undefined = undefined;
+  let warning: string | undefined = undefined;
   if (
     pr_impact !== undefined &&
-    max_commit_impact >= 0 &&
+    max_commit_impact !== undefined &&
     pr_impact != max_commit_impact
   ) {
+    warning = `Impact from PR title (${Impact[pr_impact]}) differs from maximum commit impact (${Impact[max_commit_impact]}). Using PR title impact (${Impact[pr_impact]}) for version bump.`;
     core.warning(
       `Impact from PR title (${Impact[pr_impact]}) differs from maximum commit impact (${Impact[max_commit_impact]}).`,
     );
@@ -41,10 +51,10 @@ export async function getImpactFromGithub(pr: PullRequest, token: string): Promi
       `Using PR commit impact (${Impact[pr_impact]}) for version bump.`,
     );
     final_impact = pr_impact;
-  } else if (pr_impact) {
+  } else if (pr_impact !== undefined) {
     core.info(`Using PR title impact (${pr_impact}) for version bump.`);
     final_impact = pr_impact;
-  } else if (max_commit_impact) {
+  } else if (max_commit_impact !== undefined) {
     core.info(
       `Using maximum commit impact (${max_commit_impact}) for version bump.`,
     );
@@ -55,7 +65,14 @@ export async function getImpactFromGithub(pr: PullRequest, token: string): Promi
     );
     core.setFailed("No Impact determined.");
   }
-  return final_impact;
+
+  return {
+    prImpact: pr_impact,
+    commitImpacts: commit_impacts,
+    maxCommitImpact: max_commit_impact,
+    finalImpact: final_impact,
+    warning,
+  };
 }
 
 export async function run() {
@@ -92,10 +109,11 @@ export async function run() {
     }
     core.info(`Found PR #${pr.number} title: ${pr.title}`);
 
-    const impact = await getImpactFromGithub(pr, token);
-    if (impact === undefined) {
+    const impactRes = await getImpactFromGithub(pr, token);
+    if (!impactRes || impactRes.finalImpact === undefined) {
       return;
     }
+    const impact = impactRes.finalImpact;
     // Compute the bumped base version first so we can reason about prereleases
     const bumped_base_version = last_release_version.bump(impact);
 
@@ -136,7 +154,7 @@ export async function run() {
       `Bumping version from ${last_release_version.toString()} to ${new_version.toString()}`,
     );
 
-    core.info(`Final determined impact: ${String(impact)}`);
+  core.info(`Final determined impact: ${String(impact)}`);
 
     core.setOutput("tag", new_version.as_tag());
     core.setOutput("version", new_version.toString());
@@ -149,9 +167,16 @@ export async function run() {
         const lines = [
           `### Versioneer summary`,
           `- previous: ${last_release_version.toString()}`,
+          `- PR impact: ${impactRes.prImpact !== undefined ? Impact[impactRes.prImpact] : 'none'}`,
+          `- commit impacts: ${
+            impactRes.commitImpacts && impactRes.commitImpacts.length > 0
+              ? impactRes.commitImpacts.map((i) => Impact[i]).join(", ")
+              : 'none'
+          }`,
           `- new: ${new_version.toString()} (${new_version.as_tag()})`,
           `- pep-440: ${new_version.as_pep_440()}`,
-          `- impact: ${Impact[impact] ?? String(impact)}`,
+          `- final impact: ${impact !== undefined ? Impact[impact] : 'none'}`,
+          impactRes.warning ? `- warning: ${impactRes.warning}` : "",
         ];
         await fs.appendFile(summaryPath, lines.join("\n") + "\n");
         core.info(`Wrote job summary to ${summaryPath}`);
