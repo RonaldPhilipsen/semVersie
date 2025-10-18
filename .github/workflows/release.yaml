@@ -20,6 +20,14 @@ jobs:
       version: ${{ steps.unnamed_versioning_tool.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '24'
+      - name: setup dependencies
+        run: npm install
+      - name: build distribution
+        run: npm run build
       - id: unnamed_versioning_tool
         name: unnamed_versioning_tool
         uses: ./
