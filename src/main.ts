@@ -192,9 +192,3 @@ export async function run() {
     core.setFailed(String(err));
   }
 }
-
-// Only auto-run when not executing under Jest. Tests should import the
-// module and call `run()` explicitly to control execution.
-if (!process.env.JEST_WORKER_ID) {
-  run();
-}
