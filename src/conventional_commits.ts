@@ -1,5 +1,5 @@
 import * as core from "@actions/core";
-import { Impact } from "./semver";
+import { Impact } from "./semver.js";
 
 /**
  * Maps conventional commit types to the corresponding BumpType used by the versioning logic.
