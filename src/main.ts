@@ -159,30 +159,34 @@ export async function run() {
     core.setOutput("tag", new_version.as_tag());
     core.setOutput("version", new_version.toString());
     core.setOutput("version-pep-440", new_version.as_pep_440());
-    // Write a concise job summary for GitHub Actions UI (GITHUB_STEP_SUMMARY)
+    // Write a concise job summary using the Actions toolkit `core.summary` API.
     try {
-      const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-      if (summaryPath) {
-        const fs = await import("fs/promises");
-        const lines = [
-          `### Versioneer summary`,
-          `- previous: ${last_release_version.toString()}`,
-          `- PR impact: ${impactRes.prImpact !== undefined ? Impact[impactRes.prImpact] : 'none'}`,
-          `- commit impacts: ${
-            impactRes.commitImpacts && impactRes.commitImpacts.length > 0
-              ? impactRes.commitImpacts.map((i) => Impact[i]).join(", ")
-              : 'none'
-          }`,
-          `- new: ${new_version.toString()} (${new_version.as_tag()})`,
-          `- pep-440: ${new_version.as_pep_440()}`,
-          `- final impact: ${impact !== undefined ? Impact[impact] : 'none'}`,
-          impactRes.warning ? `- warning: ${impactRes.warning}` : "",
-        ];
-        await fs.appendFile(summaryPath, lines.join("\n") + "\n");
-        core.info(`Wrote job summary to ${summaryPath}`);
+      const prImpactStr = impactRes.prImpact !== undefined ? Impact[impactRes.prImpact] : "none";
+      const commitImpactsStr = impactRes.commitImpacts && impactRes.commitImpacts.length > 0
+        ? impactRes.commitImpacts.map((i) => Impact[i]).join(", ")
+        : "none";
+      const finalImpactStr = impact !== undefined ? Impact[impact] : "none";
+
+      core.summary
+        .addHeading("unnamed_versioning_tool summary", 2)
+        .addTable([
+          ["Item", "Value"],
+          ["Previous", last_release_version.toString()],
+          ["New", `${new_version.toString()} (${new_version.as_tag()})`],
+          ["PEP 440", new_version.as_pep_440()],
+          ["PR impact", prImpactStr],
+          ["Commit impacts", commitImpactsStr],
+          ["Final impact", finalImpactStr],
+        ]);
+
+      if (impactRes.warning) {
+        core.summary.addRaw(`\n⚠️ **Warning:** ${impactRes.warning}`);
       }
+
+      await core.summary.write();
+      core.info("Wrote job summary via core.summary");
     } catch (err) {
-      core.debug(`Failed to write job summary: ${String(err)}`);
+      core.debug(`Failed to write job summary via core.summary: ${String(err)}`);
     }
   } catch (err) {
     core.setFailed(String(err));
