@@ -1,0 +1,25 @@
+name: "Release"
+
+on:
+  pull_request:
+    types:
+      - opened
+      - closed
+      - edited
+      - synchronize
+    branches:
+      - main
+
+jobs:
+  unnamed_versioning_tool:
+    name: unnamed_versioning_tool
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to be able to push commits
+    outputs:
+      version: ${{ steps.unnamed_versioning_tool.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: unnamed_versioning_tool
+        name: unnamed_versioning_tool
+        uses: ./

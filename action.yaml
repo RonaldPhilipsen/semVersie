@@ -1,0 +1,24 @@
+name: unnamed_versioning_tool
+description: Semantic versioning tool
+author: Ronald Philipsen
+
+# Add your action's branding here. This will appear on the GitHub Marketplace.
+branding:
+  icon: git-merge
+  color: purple
+
+inputs:
+  build-metadata:
+    description: Build metadata to append to the version, e.g. "build_45"
+    required: false
+    default: ""
+outputs:
+  tag:
+    description: The generated version tag without any build metadata, e.g. v1.2.3
+  version:
+    description: The generated version number without prefix, e.g. 1.2.3-rc1+build_45
+  version-pep-440:
+    description: The generated version number in PEP 440 format, e.g. 1.2.3rc1
+runs:
+  using: node24
+  main: dist/index.js

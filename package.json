@@ -1,0 +1,46 @@
+{
+  "name": "unnamed_versioning_tool",
+  "version": "0.0.1",
+  "description": "Simple semantic versioning",
+  "type": "module",
+  "private": true,
+  "homepage": "https://github.com/actions/typescript-action",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/actions/typescript-action.git"
+  },
+  "bugs": {
+    "url": "https://github.com/actions/typescript-action/issues"
+  },
+  "keywords": [
+    "actions"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "ncc build src/index.ts -o dist -m",
+    "test": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 npx jest",
+    "format": "npx prettier --write .",
+    "lint": "npx eslint ."
+  },
+  "author": "Ronald Philipsen",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1"
+  },
+  "devDependencies": {
+    "@github/local-action": "^2.2.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.8.1",
+    "@vercel/ncc": "^0.38.4",
+    "jest": "^30.2.0",
+    "prettier": "^3.6.2",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.3"
+  }
+}
