@@ -91,6 +91,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git switch -c release-${{ needs.unnamed_versioning_tool.outputs.version }}
+          git add -f dist/*
           git commit -am "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
           git push --set-upstream origin release-${{ needs.unnamed_versioning_tool.outputs.version }}
       - name: download release notes artifact
