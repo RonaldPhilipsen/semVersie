@@ -93,6 +93,10 @@ export async function handle_release_candidates(
   const is_prerelease = pr.labels?.some(
     (label) => label.name.toLowerCase() === 'release-candidate',
   );
+  if (pr.merged) {
+    core.info('PR is merged; skipping release-candidate handling.');
+    return undefined;
+  }
 
   if (is_prerelease) {
     core.info('PR is marked as a release candidate.');
