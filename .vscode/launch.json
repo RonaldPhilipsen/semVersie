@@ -2,12 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Local Action",
+      "name": "Debug Action",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "local-action",
+      "runtimeExecutable": "npx",
       "cwd": "${workspaceRoot}",
-      "args": [".", "src/main.ts", ".env"],
+      "args": ["@github/local-action", ".", "src/main.ts", ".env"],
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**", "node_modules/**"]
     }

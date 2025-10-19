@@ -1,5 +1,5 @@
-import * as core from "@actions/core";
-import { Impact } from "./semver";
+import * as core from '@actions/core';
+import { Impact } from './semver.js';
 
 /**
  * Maps conventional commit types to the corresponding BumpType used by the versioning logic.
@@ -55,7 +55,7 @@ export function getConventionalImpact(
  * @returns BumpType.MAJOR if "BREAKING CHANGE" is found, otherwise undefined
  */
 export function ParseConventionalBody(body: string) {
-  if (body.includes("BREAKING CHANGE")) {
+  if (body.includes('BREAKING CHANGE')) {
     return Impact.MAJOR;
   }
   return undefined;
@@ -77,16 +77,16 @@ export function ParseConventionalTitle(title: string) {
     );
     return undefined;
   }
-  const commit_type = match.groups?.["type"];
+  const commit_type = match.groups?.['type'];
 
   if (!commit_type) {
     core.setFailed(`Could not extract commit type from PR title: ${title}`);
     return undefined;
   }
-  const breaking = match.groups?.["breaking"];
+  const breaking = match.groups?.['breaking'];
   core.debug(`Extracted commit type: ${commit_type}`);
   const key = commit_type as keyof typeof TypeToImpactMapping;
-  var impact = TypeToImpactMapping[key];
+  let impact = TypeToImpactMapping[key];
   if (breaking) {
     core.debug("Detected breaking change indicator '!' in title");
     impact = Impact.MAJOR;
