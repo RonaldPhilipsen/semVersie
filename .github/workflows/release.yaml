@@ -52,6 +52,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         uses: ./
+      - name: Upload Release Notes Artifact
+        if: steps.unnamed_versioning_tool.outputs.release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: ${{ steps.unnamed_versioning_tool.outputs.release-notes-file }}
 
   release:
     name: Create Release
@@ -84,12 +90,23 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git switch -c release-${{ steps.unnamed_versioning_tool.outputs.version }}
+          git switch -c release-${{ needs.unnamed_versioning_tool.outputs.version }}
           git commit -am "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
-          git push origin HEAD:${{ steps.unnamed_versioning_tool.outputs.version }}
+          git push --set-upstream origin release-${{ needs.unnamed_versioning_tool.outputs.version }}
+      - name: download release notes artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: .
       - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release create ${{ needs.unnamed_versioning_tool.outputs.tag }} \
             --title "${{ needs.unnamed_versioning_tool.outputs.tag }}" \
-            --notes-file "${{ needs.unnamed_versioning_tool.outputs.release-notes-file }}"
+            --notes-file "${{ needs.unnamed_versioning_tool.outputs.release-notes-file }}" \
             $([[ "${{ needs.unnamed_versioning_tool.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
+      - name: clean up branch
+        if: always()
+        run: |
+          git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}

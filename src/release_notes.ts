@@ -4,7 +4,7 @@ import { Impact } from './semver.js';
 
 function getReleaseNoteSection(title: string, commits: Commit[]): string[] {
   const lines: string[] = [];
-  lines.push(`##${title} \n`);
+  lines.push(`## ${title} \n`);
   for (const commit of commits) {
     lines.push(`- ${commit.title} (${commit.sha.slice(0, 7)})`);
   }
@@ -38,18 +38,18 @@ export function generateReleaseNotes(commits: Commit[]): string {
   }
 
   const lines: string[] = [];
-  lines.push('# Release Notes');
+  lines.push('# Release Notes\n');
   if (breaking.length > 0) {
-    lines.push(...getReleaseNoteSection('Breaking Changes', breaking));
+    lines.push(...getReleaseNoteSection('🚨 Breaking Changes', breaking));
   }
   if (features.length > 0) {
-    lines.push(...getReleaseNoteSection('New Features', features));
+    lines.push(...getReleaseNoteSection('🧪 New Features', features));
   }
   if (fixes.length > 0) {
-    lines.push(...getReleaseNoteSection('Bug Fixes', fixes));
+    lines.push(...getReleaseNoteSection('🐞 Bug Fixes', fixes));
   }
   if (others.length > 0) {
-    lines.push(...getReleaseNoteSection('Other Changes', others));
+    lines.push(...getReleaseNoteSection('➕ Other Changes', others));
   }
   lines.push('');
   return lines.join('\n');

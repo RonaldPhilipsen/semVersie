@@ -191,7 +191,7 @@ export async function write_job_summary(
     core.summary.addHeading('unnamed_versioning_tool summary', 2).addTable([
       ['Item', 'Value'],
       ['Previous', last_release_version.toString()],
-      ['New', `${new_version.toString()} (${new_version.as_tag()})`],
+      ['New', `${new_version.toString()}`],
       ['PEP 440', new_version.as_pep_440()],
       ['PR impact', prImpactStr],
       ['Commit impacts', commitImpactsStr],
@@ -282,7 +282,10 @@ export async function run() {
     await writeFile(filePath, release_notes, 'utf8');
     core.info(`Wrote release notes to ${filePath}`);
 
-    core.setOutput('release', pr.merged && impact !== Impact.NOIMPACT);
+    core.setOutput(
+      'release',
+      (pr.merged && impact !== Impact.NOIMPACT) || prerelease !== undefined,
+    );
     core.setOutput('release-notes-file', filePath);
     core.setOutput('prerelease', prerelease !== undefined);
     core.setOutput('tag', new_version.as_tag());
