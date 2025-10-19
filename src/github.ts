@@ -1,6 +1,6 @@
-import * as core from "@actions/core";
-import * as github from "@actions/github";
-import { SemanticVersion } from "./semver.js";
+import * as core from '@actions/core';
+import * as github from '@actions/github';
+import { LRUCache } from './utils.js';
 
 export type Commit = { sha: string; title: string; body?: string };
 
@@ -19,7 +19,7 @@ export type Tag = {
   zipball_url?: string;
   tarball_url?: string;
   node_id?: string;
-  [k: string]: any;
+  [k: string]: unknown;
 };
 
 /**
@@ -41,15 +41,15 @@ export type Release = {
   author?: {
     login?: string;
     id?: number;
-    [k: string]: any;
+    [k: string]: unknown;
   };
   assets?: Array<{
     id?: number;
     name?: string;
     browser_download_url?: string;
-    [k: string]: any;
+    [k: string]: unknown;
   }>;
-  [k: string]: any;
+  [k: string]: unknown;
 };
 
 /**
@@ -74,20 +74,46 @@ export type PullRequest = {
   draft: boolean;
   merged: boolean;
   merge_commit_sha: string | null;
-  [k: string]: any;
+  [k: string]: unknown;
 };
+
+// Small helper to centralize payload->PR extraction logic.
+// We keep the cast narrow and local to avoid wide `any` usage while
+// keeping the extraction logic concise.
+function extractPullRequestFromPayload(ev: unknown): PullRequest | undefined {
+  const payload = ev as
+    | { event?: { pull_request?: PullRequest }; pull_request?: PullRequest }
+    | undefined;
+  return payload?.event?.pull_request ?? payload?.pull_request;
+}
 
 /**
  * Return the whole Pull Request object from the Actions context when available.
  */
 export function getPrFromContext(): PullRequest | undefined {
   const ctx = github.context;
-  const ev = ctx.payload as any;
-  // event.pull_request wrapper
-  if (ev && ev.event && ev.event.pull_request)
-    return ev.event.pull_request as PullRequest;
-  if (ev && ev.pull_request) return ev.pull_request as PullRequest;
-  return undefined;
+  return extractPullRequestFromPayload(ctx.payload as unknown);
+}
+
+function getOctokitAndRepo(token: string) {
+  const octokit = github.getOctokit(token);
+  const ctx = github.context;
+  const owner = ctx.repo.owner;
+  const repo = ctx.repo.repo;
+  return { octokit, owner, repo };
+}
+
+// Module-level cache keyed by owner/repo and operation. Tests can mock this by
+// mocking the './utils' import.
+const GH_CACHE = new LRUCache<Promise<unknown>>();
+
+// Small helper to parse an Octokit commit entry into our Commit type.
+function parseCommit(c: unknown): Commit {
+  const cc = c as { sha?: string; commit?: { message?: string } };
+  const msg = cc.commit?.message ?? '';
+  const title = msg ? msg.split('\n')[0] : '';
+  const body = msg ? msg.split('\n').slice(1).join('\n').trim() : undefined;
+  return { sha: cc.sha!, title, body };
 }
 
 /**
@@ -95,18 +121,9 @@ export function getPrFromContext(): PullRequest | undefined {
  * Checks common payload locations and returns undefined when not found.
  */
 export function getPrTitleFromContext(): string | undefined {
-  const ctx = github.context;
-  // Common locations for PR payload differ between runners/events
-  const ev = ctx.payload as any;
-  // event.pull_request (when using octokit/event payload wrapper)
-  if (ev && ev.event && ev.event.pull_request && ev.event.pull_request.title) {
-    return ev.event.pull_request.title;
-  }
-  // payload.pull_request (typical for pull_request events)
-  if (ev && ev.pull_request && ev.pull_request.title) {
-    return ev.pull_request.title;
-  }
-  return undefined;
+  // Reuse getPrFromContext to avoid duplicating payload parsing logic
+  const pr = getPrFromContext();
+  return pr?.title;
 }
 
 /**
@@ -115,14 +132,10 @@ export function getPrTitleFromContext(): string | undefined {
  */
 export async function getPrCommits(token: string): Promise<Commit[]> {
   try {
+    // Try to obtain a PullRequest object from context first; fall back to ref parsing
+    const pr = getPrFromContext();
+    let pull_number: number | undefined = pr?.number;
     const ctx = github.context;
-    const pr = (ctx.payload as any)?.pull_request;
-    const owner = ctx.repo.owner;
-    const repo = ctx.repo.repo;
-    let pull_number: number | undefined;
-
-    if (pr && pr.number) pull_number = pr.number;
-    // If event ref is refs/pull/:number/merge try to extract
     if (!pull_number && ctx.ref) {
       const m = ctx.ref.match(/^refs\/pull\/(\d+)\/(?:merge|head)$/);
       if (m) pull_number = Number(m[1]);
@@ -130,26 +143,44 @@ export async function getPrCommits(token: string): Promise<Commit[]> {
 
     if (!pull_number) {
       core.debug(
-        "No pull request number found in context; cannot list commits",
+        'No pull request number found in context; cannot list commits',
       );
       return [];
     }
-
-    const octokit = github.getOctokit(token);
-    const res = await octokit.rest.pulls.listCommits({
-      owner,
-      repo,
-      pull_number,
-    });
-    const commits = res.data.map((c) => ({
-      sha: c.sha!,
-      title:
-        c.commit && c.commit.message ? c.commit.message.split("\n")[0] : "",
-      body:
-        c.commit && c.commit.message
-          ? c.commit.message.split("\n").slice(1).join("\n").trim()
-          : undefined,
-    }));
+    if (!token) {
+      core.debug('No token provided; cannot list PR commits');
+      return [];
+    }
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+    const cacheKey = `prCommits:${owner}/${repo}:${pull_number}`;
+    let p = GH_CACHE.get(cacheKey) as Promise<Commit[]> | undefined;
+    if (!p) {
+      let raw: Promise<Commit[]>;
+      try {
+        const call = octokit.rest.pulls.listCommits({
+          owner,
+          repo,
+          pull_number,
+        });
+        raw = Promise.resolve(call).then((res) => {
+          return res.data.map((c) => parseCommit(c));
+        });
+      } catch (err) {
+        core.debug(
+          `getPrCommits: synchronous listCommits threw: ${String(err)}`,
+        );
+        return [];
+      }
+      const wrapped = raw.catch((err) => {
+        GH_CACHE.delete(cacheKey);
+        core.debug(`getPrCommits: listCommits failed: ${String(err)}`);
+        return [] as Commit[];
+      });
+      p = wrapped;
+      GH_CACHE.set(cacheKey, p as unknown as Promise<unknown>);
+      p.finally(() => GH_CACHE.delete(cacheKey));
+    }
+    const commits = await p;
     core.info(`Found ${commits.length} commits in PR`);
     return commits;
   } catch (err) {
@@ -162,22 +193,27 @@ export async function getPrCommits(token: string): Promise<Commit[]> {
  * Return the most recent tag name for the repository in the Actions context.
  * If no token is provided or the call fails, returns undefined.
  */
-export async function getLatestTag(
-  token: string,
-): Promise<string | undefined> {
+export async function getLatestTag(token: string): Promise<string | undefined> {
   try {
-    const ctx = github.context;
-    const owner = ctx.repo.owner;
-    const repo = ctx.repo.repo;
-
-    const octokit = github.getOctokit(token);
-    // Request a single tag; GitHub's `listTags` returns tags ordered by commit-ish,
-    // but requesting one page with per_page=1 should give the latest by Git reference order.
-    const res = await octokit.rest.repos.listTags({ owner, repo, per_page: 1 });
-    if (res && Array.isArray(res.data) && res.data.length > 0) {
-      return res.data[0].name;
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+    const cacheKey = `latestTag:${owner}/${repo}`;
+    let p = GH_CACHE.get(cacheKey) as Promise<string | undefined> | undefined;
+    if (!p) {
+      const raw = Promise.resolve()
+        .then(() => octokit.rest.repos.listTags({ owner, repo, per_page: 1 }))
+        .then((res) => {
+          return (res.data && res.data[0] && res.data[0].name) || undefined;
+        });
+      const wrapped = raw.catch((err) => {
+        GH_CACHE.delete(cacheKey);
+        core.debug(`getLatestTag: listTags failed: ${String(err)}`);
+        return undefined as string | undefined;
+      });
+      p = wrapped;
+      GH_CACHE.set(cacheKey, p as unknown as Promise<unknown>);
+      p.finally(() => GH_CACHE.delete(cacheKey));
     }
-    return undefined;
+    return p;
   } catch (err) {
     core.debug(`getLatestTag failed: ${String(err)}`);
     return undefined;
@@ -192,79 +228,61 @@ export async function getLatestRelease(
   token: string,
 ): Promise<Release | undefined> {
   try {
-    const ctx = github.context;
-    const owner = ctx.repo.owner;
-    const repo = ctx.repo.repo;
-    const octokit = github.getOctokit(token);
-    const res = await octokit.rest.repos.getLatestRelease({ owner, repo });
-    if (res && res.data) {
-      return res.data as Release;
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+    const cacheKey = `latestRelease:${owner}/${repo}`;
+    let p = GH_CACHE.get(cacheKey) as Promise<Release | undefined> | undefined;
+    if (!p) {
+      const raw = Promise.resolve()
+        .then(() => octokit.rest.repos.getLatestRelease({ owner, repo }))
+        .then((res) => {
+          return res && res.data ? (res.data as Release) : undefined;
+        });
+      const wrapped = raw.catch((err) => {
+        GH_CACHE.delete(cacheKey);
+        core.debug(`getLatestRelease: getLatestRelease failed: ${String(err)}`);
+        return undefined as Release | undefined;
+      });
+      p = wrapped;
+      GH_CACHE.set(cacheKey, p as unknown as Promise<unknown>);
+      p.finally(() => GH_CACHE.delete(cacheKey));
     }
-    return undefined;
+    return p;
   } catch (err) {
     core.debug(`getLatestRelease failed: ${String(err)}`);
     return undefined;
   }
 }
 
-/**
- * Return all pull requests labelled as release-candidate that were merged since
- * the latest release. If no token is provided or an error occurs, returns an
- * empty array. This uses the `getLatestRelease` published_at timestamp to
- * filter PRs by their merged_at field.
- */
-export async function getAllRCsSinceLatestRelease(
+export async function createRelease(
   token: string,
-  baseline: SemanticVersion,
-): Promise<Tag[]> {
+  tag_name: string,
+  target_commitish: string,
+  name: string,
+  body: string,
+  draft: boolean,
+  prerelease: boolean,
+  make_latest: boolean,
+): Promise<Release | undefined> {
   try {
-    const ctx = github.context;
-    const owner = ctx.repo.owner;
-    const repo = ctx.repo.repo;
-    const octokit = github.getOctokit(token);
-
-    // List tags and collect RC tags newer than baseline
-    const per_page = 100;
-    let page = 1;
-    const results: Tag[] = [];
-    while (true) {
-      const res = await octokit.rest.repos.listTags({
-        owner,
-        repo,
-        per_page,
-        page,
-      });
-      if (!res || !Array.isArray(res.data) || res.data.length === 0) break;
-
-      for (const t of res.data as Tag[]) {
-        const parsed = SemanticVersion.parse(t.name);
-        if (!parsed) continue;
-        // Require a prerelease component that indicates an RC
-        if (!parsed.prerelease) continue;
-        if (!parsed.prerelease.toLowerCase().includes("rc")) continue;
-
-        const cmp = SemanticVersion.compare(parsed, baseline as any);
-        if (cmp < 0) {
-          // We've reached tags older than the baseline — tags are expected
-          // to be returned newest-first, so we can stop paging further.
-          core.debug(`Encountered older tag ${t.name}; stopping search.`);
-          return results;
-        }
-        if (cmp === 0) continue; // equal to baseline, skip
-        // cmp > 0 -> newer than baseline
-        results.push(t);
-      }
-
-      if (res.data.length < per_page) break;
-      page += 1;
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+    const res = await octokit.rest.repos.createRelease({
+      owner: owner,
+      repo: repo,
+      tag_name: tag_name,
+      target_commitish: target_commitish,
+      name: name,
+      body: body,
+      draft: draft,
+      prerelease: prerelease,
+      make_latest: make_latest ? 'true' : 'false',
+    });
+    if (res && res.data) {
+      core.info(`Created release for tag ${tag_name}`);
+      return res.data as Release;
     }
-
-    core.info(
-      `Found ${results.length} release-candidate tag(s) since latest release`,
-    );
-    return results;
+    throw Error('Failed to create release');
   } catch (err) {
-    core.debug(`getAllRCsSinceLatestRelease failed: ${String(err)}`);
-    return [];
+    core.debug(`createRelease failed: ${String(err)}`);
+    throw Error('Failed to create release');
   }
 }

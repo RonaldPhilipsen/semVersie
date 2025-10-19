@@ -1,49 +1,52 @@
 # unnamed_versioning_tool
 
-Generate releases based on conventional-commit style pull requests.
+Simple semantic versioning for GitHub Actions and repositories that use
+conventional commits.
 
-Features:
+What it does
 
-- calculates [semantic version](https://semver.org/) bumps from pull [conventional-commit](https://www.conventionalcommits.org/en/v1.0.0/) style pull requests.
+This project calculates semantic-version bumps (major/minor/patch) from
+conventional-commit style pull requests and can be used in a GitHub Actions
+workflow to automatically determine the next release version.
 
-The idea here is that it should be extremely simple and fast to setup semantic versioning.
+Key features
 
-The tool prescribes
+- Infers semver bump from conventional commits
+- Optional build metadata via workflow inputs
+- Simple to integrate into CI workflows
 
-This tool works well with [renovate](https://github.com/renovatebot/renovate) as long as you enable the `semanticCommits` prefix.
+## Usage (GitHub Actions)
 
-## Usage
-
-```yaml
-jobs:
-  unnamed_versioning_tool:
-    name: unnamed_versioning_tool
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # to be able to push commits
-    outputs:
-      version: ${{ steps.unnamed_versioning_tool.outputs.version }}
-    steps:
-      name: unnamed_versioning_tool
-      uses: RonaldPhilipsen/unnamed_versioning_tool@SHA256 # vX.Y.Z
-```
-
-### providing build metadata
-
-If you want to provide build metadata to include in the versioning you can do that using the `build-metadata` input
+Example workflow snippet that runs the action and exposes the computed version
+as a job output:
 
 ```yaml
 jobs:
-  unnamed_versioning_tool:
-    name: unnamed_versioning_tool
+  version:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # to be able to push commits
+      contents: write
     outputs:
-      version: ${{ steps.unnamed_versioning_tool.outputs.version }}
+      version: ${{ steps.version.outputs.version }}
     steps:
-      name: unnamed_versioning_tool
-      uses: RonaldPhilipsen/unnamed_versioning_tool@SHA256 # vX.Y.Z
-      with: 
-        build-metadata: ${{ github.sha }}
+      - name: Calculate version
+        id: version
+        uses: RonaldPhilipsen/unnamed_versioning_tool@v0.0.1
+        with:
+          # Optional: pass build metadata (e.g. commit SHA)
+          build-metadata: ${{ github.sha }}
 ```
+
+## Development
+
+The project uses Node.js for tests/build. Useful scripts (from `package.json`):
+
+- npm run build — build the distribution (ncc)
+- npm test — run tests
+- npm run lint — run ESLint
+
+## Contributing
+
+Contributions are welcome. Please open issues or pull requests on the GitHub
+repository. Follow the conventional commits format for PR titles so the tool can
+infer versions correctly.

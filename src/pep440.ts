@@ -1,9 +1,9 @@
-import * as core from "@actions/core";
-import { SemanticVersion } from "./semver.js";
+import * as core from '@actions/core';
+import { SemanticVersion } from './semver.js';
 
 export function parse_pep440(version: string): SemanticVersion | undefined {
   const pep440 =
-    /v?(?:(?:(?<epoch>[0-9]+)!)?(?<release>[0-9]+(?:\.[0-9]+)*)(?<pre>[-_\.]?(?<pre_l>(a|b|c|rc|alpha|beta|pre|preview))[-_\.]?(?<pre_n>[0-9]+)?)?(?<post>(?:-(?<post_n1>[0-9]+))|(?:[-_\.]?(?<post_l>post|rev|r)[-_\.]?(?<post_n2>[0-9]+)?))?(?<dev>[-_\.]?(?<dev_l>dev)[-_\.]?(?<dev_n>[0-9]+)?)?)(?:\+(?<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?/g;
+    /^v?(?:(?:(?<epoch>[0-9]+)!)?(?<release>[0-9]+(?:\.[0-9]+)*)(?<pre>[-_.]?(?<pre_l>(a|b|c|rc|alpha|beta|pre|preview))[-_.]?(?<pre_n>[0-9]+)?)?(?<post>(?:-(?<post_n1>[0-9]+))|(?:[-_.]?(?<post_l>post|rev|r)[-_.]?(?<post_n2>[0-9]+)?))?(?<dev>[-_.]?(?<dev_l>dev)[-_.]?(?<dev_n>[0-9]+)?)?)(?:\+(?<local>[a-z0-9]+(?:[-_.]?[a-z0-9]+)*))?$/i;
   core.info(`Attempting to parse version "${version}" as PEP 440 format.`);
   const match = version.match(pep440);
   if (!match || !match.groups) {
@@ -32,19 +32,31 @@ export function parse_pep440(version: string): SemanticVersion | undefined {
     );
   }
 
-  const release_parts = release.split(".").map((x) => parseInt(x, 10));
+  const release_parts = release.split('.').map((x) => parseInt(x, 10));
   const major = release_parts[0] || 0;
   const minor = release_parts[1] || 0;
   const patch = release_parts[2] || 0;
 
   let prerelease: string | undefined = undefined;
   if (pre_l) {
-    prerelease = `${pre_l}${pre_n ? `.${pre_n}` : ""}`;
+    // Normalize common PEP440 pre-release identifiers to semver-friendly names
+    const norm: { [k: string]: string } = {
+      a: 'alpha',
+      alpha: 'alpha',
+      b: 'beta',
+      beta: 'beta',
+      c: 'rc',
+      rc: 'rc',
+      pre: 'pre',
+      preview: 'pre',
+    };
+    const mapped = norm[pre_l.toLowerCase()] || pre_l.toLowerCase();
+    prerelease = `${mapped}${pre_n ? `.${pre_n}` : ''}`;
   } else if (post_n1 || post_l) {
-    const post_n = post_n1 || post_n2 || "";
-    prerelease = `post${post_n ? `.${post_n}` : ""}`;
+    const post_n = post_n1 || post_n2 || '';
+    prerelease = `post${post_n ? `.${post_n}` : ''}`;
   } else if (dev_l) {
-    prerelease = `dev${dev_n ? `.${dev_n}` : ""}`;
+    prerelease = `dev${dev_n ? `.${dev_n}` : ''}`;
   }
 
   return new SemanticVersion(major, minor, patch, prerelease, local);

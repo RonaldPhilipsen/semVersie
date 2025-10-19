@@ -1,4 +1,4 @@
-import * as core from "@actions/core";
+import * as core from '@actions/core';
 
 export enum Impact {
   NOIMPACT,
@@ -56,12 +56,12 @@ export class SemanticVersion {
     if (this.prerelease) {
       // Convert prerelease to PEP 440 format
       const pep440_prerelease = this.prerelease
-        .replace(/-/g, ".")
+        .replace(/-/g, '.')
         .replace(/([a-zA-Z]+)(\d*)/g, (_, p1, p2) => {
           const mapping: { [key: string]: string } = {
-            alpha: "a",
-            beta: "b",
-            rc: "rc",
+            alpha: 'a',
+            beta: 'b',
+            rc: 'rc',
           };
           return mapping[p1] ? mapping[p1] + p2 : p1 + p2;
         });
@@ -136,8 +136,8 @@ export class SemanticVersion {
     if (a.prerelease && !b.prerelease) return -1;
 
     // Both have prerelease strings — compare dot-separated identifiers
-    const aParts = a.prerelease!.split(".");
-    const bParts = b.prerelease!.split(".");
+    const aParts = a.prerelease!.split('.');
+    const bParts = b.prerelease!.split('.');
     const len = Math.max(aParts.length, bParts.length);
     for (let i = 0; i < len; i++) {
       const ap = aParts[i];
@@ -174,8 +174,8 @@ export class SemanticVersion {
       return undefined;
     }
     const major = parseInt(match.groups.major, 10);
-    const minor = parseInt(match.groups.minor ?? "0", 10);
-    const patch = parseInt(match.groups.patch ?? "0", 10);
+    const minor = parseInt(match.groups.minor ?? '0', 10);
+    const patch = parseInt(match.groups.patch ?? '0', 10);
     const prerelease = match.groups.prerelease;
     const buildmetadata = match.groups.buildmetadata;
     const v = new SemanticVersion(major, minor, patch);
@@ -204,10 +204,34 @@ export class SemanticVersion {
         parsed.patch === base.patch &&
         parsed.prerelease
       ) {
-        const m = parsed.prerelease.match(/rc(?:\.|-|_)?(\d+)/i);
-        if (m) {
-          const n = Number(m[1]);
-          if (!isNaN(n) && n > maxRc) maxRc = n;
+        // Examine dot/dash/underscore separated identifiers and only
+        // accept strict rc forms:
+        //  - bare 'rc' => treated as 0
+        //  - 'rc<digits>' or 'rc.<digits>' or 'rc-<digits>' etc. => numeric index
+        // Ignore non-numeric suffixes like 'rcX' or 'rc.beta'.
+        const parts = parsed.prerelease.split(/[.\-_]/);
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i];
+          // Strict single-token form like 'rc123'
+          const mInline = part.match(/^rc([0-9]+)$/i);
+          if (mInline) {
+            const n = Number(mInline[1]);
+            if (!isNaN(n) && n > maxRc) maxRc = n;
+            continue;
+          }
+
+          // Exact 'rc' token: accept as 0 only if followed by a numeric token or
+          // if it's the only rc-related token (i.e., not followed by non-numeric)
+          if (/^rc$/i.test(part)) {
+            const next = parts[i + 1];
+            if (next === undefined) {
+              if (0 > maxRc) maxRc = 0;
+            } else if (/^[0-9]+$/.test(next)) {
+              const n = Number(next);
+              if (!isNaN(n) && n > maxRc) maxRc = n;
+            }
+            // If next token exists but is non-numeric (e.g., 'beta'), ignore.
+          }
         }
       }
     }

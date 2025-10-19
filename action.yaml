@@ -11,12 +11,20 @@ inputs:
   build-metadata:
     description: Build metadata to append to the version, e.g. "build_45"
     required: false
-    default: ""
+    default: ''
 outputs:
+  release:
+    description: Whether a release should be created (true/false)
+  release-notes-file:
+    description: The generated release notes for the new version
+  prerelease:
+    description: Whether the new version is a prerelease (true/false)
   tag:
-    description: The generated version tag without any build metadata, e.g. v1.2.3
+    description:
+      The generated version tag without any build metadata, e.g. v1.2.3
   version:
-    description: The generated version number without prefix, e.g. 1.2.3-rc1+build_45
+    description:
+      The generated version number without prefix, e.g. 1.2.3-rc1+build_45
   version-pep-440:
     description: The generated version number in PEP 440 format, e.g. 1.2.3rc1
 runs:
