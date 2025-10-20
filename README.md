@@ -31,11 +31,13 @@ jobs:
     steps:
       - name: Calculate version
         id: version
-        uses: RonaldPhilipsen/unnamed_versioning_tool@v0.0.1
+        uses: RonaldPhilipsen/unnamed_versioning_tool@vX.Y.Z
         with:
           # Optional: pass build metadata (e.g. commit SHA)
           build-metadata: ${{ github.sha }}
 ```
+
+Please note that running this action from a non-fixed version is *not* supported
 
 ## Development
 
