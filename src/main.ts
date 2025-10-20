@@ -44,16 +44,14 @@ export async function getImpactFromGithub(
       `Impact from PR title (${Impact[pr_impact.impact]}) differs from maximum commit impact (${Impact[max_commit_impact]}).`,
     );
     core.warning(
-      `Using PR commit impact (${Impact[pr_impact.impact]}) for version bump.`,
+      `Using PR title impact (${Impact[pr_impact.impact]}) for version bump.`,
     );
     final_impact = pr_impact;
   } else if (pr_impact !== undefined) {
-    core.info(`Using PR title impact (${pr_impact}) for version bump.`);
+    core.info(`Using PR title impact (${Impact[pr_impact.impact]}) for version bump.`);
     final_impact = pr_impact;
   } else if (max_commit_impact !== undefined) {
-    core.info(
-      `Using maximum commit impact (${max_commit_impact}) for version bump.`,
-    );
+    core.info(`Using maximum commit impact (${Impact[max_commit_impact]}) for version bump.`);
     final_impact = commit_impacts.find((c) => c.impact === max_commit_impact);
   } else {
     core.error(
@@ -88,12 +86,15 @@ export async function handle_release_candidates(
 
   if (is_prerelease) {
     core.info('PR is marked as a release candidate.');
-    const previous_release_candidates = await getAllRCsSinceLatestRelease(
-      token,
-      last_release_version,
-    );
     // Determine the bumped base version (without prerelease) according to impact
     const bumped_base = last_release_version.bump(impact);
+    // Fetch previous RCs for the bumped base version. We pass the bumped base
+    // as the baseline so that RC tags targeting the bumped version are found
+    // even if they were created before the latest release.
+    const previous_release_candidates = await getAllRCsSinceLatestRelease(
+      token,
+      bumped_base,
+    );
     // Extract tag names and ask SemanticVersion to compute the next RC index
     const tagNames = previous_release_candidates.map((t: Tag) => t.name);
     const nextRc = SemanticVersion.nextRcIndex(bumped_base, tagNames);
@@ -135,7 +136,18 @@ export async function getAllRCsSinceLatestRelease(
       if (!parsed.prerelease) return;
       if (!parsed.prerelease.toLowerCase().includes('rc')) return;
       const cmp = SemanticVersion.compare(parsed, baseline);
-      if (cmp < 0) return; // skip older
+
+      if (cmp <= 0) {
+        if (
+          parsed.major === baseline.major &&
+          parsed.minor === baseline.minor &&
+          parsed.patch === baseline.patch
+        ) {
+          // allow RC targeting same base version even if cmp < 0
+        } else {
+          return; // skip older
+        }
+      }
       seen.add(name);
       // preserve the original object shape where possible; at minimum include name
       results.push({ name });
