@@ -36,6 +36,7 @@ jobs:
         with:
           node-version: '24'
       - name: Cache node modules
+        timeout-minutes: 5
         uses: actions/cache@v4
         with:
           path: node_modules
@@ -44,6 +45,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-modules-
       - name: setup dependencies
+        timeout-minutes: 5
         run: npm install
       - name: build distribution
         run: npm run build
@@ -73,6 +75,7 @@ jobs:
         with:
           node-version: '24'
       - name: Cache node modules
+        timeout-minutes: 5
         uses: actions/cache@v4
         with:
           path: node_modules
@@ -91,7 +94,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git switch -c release-${{ needs.unnamed_versioning_tool.outputs.version }}
-          git add -f dist/*
+          sed -i '/\/dist\/d' .gitignore # temporarily unignore dist/ to commit built files
+          git add dist/ dist/index.js dist/package.json
           git commit -am "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
           git push --set-upstream origin release-${{ needs.unnamed_versioning_tool.outputs.version }}
       - name: download release notes artifact
