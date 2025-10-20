@@ -97,9 +97,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git switch -c release-${{ needs.unnamed_versioning_tool.outputs.version }}
           # temporarily unignore dist/ to commit built files
-          # use a sed command with proper quoting so the CI shell interprets it correctly
-          sed -i '/^dist\//d' .gitignore
-          git add dist/ dist/index.js dist/package.json
+          git add dist/ dist/index.js dist/package.json package.json package-lock.json
           git commit -m "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
           git push --set-upstream origin release-${{ needs.unnamed_versioning_tool.outputs.version }}
       - name: download release notes artifact
