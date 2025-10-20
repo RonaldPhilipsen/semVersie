@@ -24,8 +24,7 @@ jobs:
       contents: read
     outputs:
       release: ${{ steps.unnamed_versioning_tool.outputs.release }}
-      release-notes:
-        ${{ steps.unnamed_versioning_tool.outputs.release-notes }}
+      release-notes: ${{ steps.unnamed_versioning_tool.outputs.release-notes }}
       prerelease: ${{ steps.unnamed_versioning_tool.outputs.prerelease }}
       tag: ${{ steps.unnamed_versioning_tool.outputs.tag }}
       version: ${{ steps.unnamed_versioning_tool.outputs.version }}

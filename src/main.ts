@@ -76,11 +76,6 @@ export async function handle_release_candidates(
   pr: PullRequest,
   impact: Impact,
   last_release_version: SemanticVersion,
-  // optional fetcher to allow tests to inject previous RCs
-  fetchRCs?: (
-    token: string,
-    baseline: SemanticVersion,
-  ) => Promise<{ name: string }[]>,
 ) {
   let prerelease = undefined;
   const is_prerelease = pr.labels?.some(
@@ -93,13 +88,14 @@ export async function handle_release_candidates(
 
   if (is_prerelease) {
     core.info('PR is marked as a release candidate.');
-    const previous_release_candidates = await (fetchRCs
-      ? fetchRCs(token, last_release_version)
-      : getAllRCsSinceLatestRelease(token, last_release_version));
+    const previous_release_candidates = await getAllRCsSinceLatestRelease(
+      token,
+      last_release_version,
+    );
     // Determine the bumped base version (without prerelease) according to impact
     const bumped_base = last_release_version.bump(impact);
     // Extract tag names and ask SemanticVersion to compute the next RC index
-    const tagNames = previous_release_candidates.map((t) => t.name);
+    const tagNames = previous_release_candidates.map((t: Tag) => t.name);
     const nextRc = SemanticVersion.nextRcIndex(bumped_base, tagNames);
     // create the prerelease string e.g. 'rc1' (if nextRc is 1) or 'rc0' if 0
     prerelease = `rc${nextRc}`;
