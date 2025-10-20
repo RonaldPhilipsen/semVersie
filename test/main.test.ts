@@ -12,7 +12,8 @@ await (jest as any).unstable_mockModule('@actions/github', () => ({
   context: mockContext,
   getOctokit: (...args: any[]) => mockGetOctokit(...args),
 }));
-import { Impact, SemanticVersion } from '../src/semver';
+import { SemanticVersion } from '../src/semver';
+import { Impact } from '../src/types.js';
 
 describe('getImpactFromGithub - concise scenarios', () => {
   beforeEach(() => {
@@ -35,8 +36,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
     const mockedGetConventionalImpact = jest
       .fn()
       .mockImplementationOnce(() => undefined)
-      .mockImplementationOnce(() => Impact.NOIMPACT)
-      .mockImplementationOnce(() => Impact.PATCH);
+      .mockImplementationOnce(() => ({ type: 'docs', impact: Impact.NOIMPACT }))
+      .mockImplementationOnce(() => ({ type: 'fix', impact: Impact.PATCH }));
 
     // mock github/conventional_commits
     // @ts-ignore
@@ -54,10 +55,13 @@ describe('getImpactFromGithub - concise scenarios', () => {
 
     const mod = await import('../src/main');
     const { getImpactFromGithub } = mod;
-    const res = await getImpactFromGithub(pr, 'token');
-    expect(res.finalImpact).toBe(Impact.PATCH);
-    expect(res.commitImpacts).toContain(Impact.NOIMPACT);
-    expect(res.commitImpacts).toContain(Impact.PATCH);
+  const res = await getImpactFromGithub(pr, await mockedGetPrCommits());
+  // finalImpact is now a ParsedCommitInfo, so check its .impact
+  expect(res.finalImpact?.impact).toBe(Impact.PATCH);
+  // commitImpacts is an array of ParsedCommitInfo; map to impacts
+  const impacts = res.commitImpacts.map((c: any) => c.impact);
+  expect(impacts).toContain(Impact.NOIMPACT);
+  expect(impacts).toContain(Impact.PATCH);
   });
 
   test('PR title impact can override higher commit impact and warns', async () => {
@@ -70,8 +74,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
     };
     const mockedGetConventionalImpact = jest
       .fn()
-      .mockImplementationOnce(() => Impact.PATCH)
-      .mockImplementationOnce(() => Impact.MAJOR);
+      .mockImplementationOnce(() => ({ type: 'chore', impact: Impact.PATCH }))
+      .mockImplementationOnce(() => ({ type: 'feat', impact: Impact.MAJOR }));
     const mockedGetPrCommits = (jest.fn() as any).mockResolvedValue([
       { sha: 'x', title: 'feat!: break', body: undefined },
     ]);
@@ -100,9 +104,9 @@ describe('getImpactFromGithub - concise scenarios', () => {
       head: { ref: 'x', sha: 's' },
       labels: [],
     } as any;
-    const res = await getImpactFromGithub(pr, 'token');
-    expect(res.finalImpact).toBe(Impact.PATCH);
-    expect(res.warning).toBeDefined();
+  const res = await getImpactFromGithub(pr, await mockedGetPrCommits());
+  expect(res.finalImpact?.impact).toBe(Impact.PATCH);
+  expect(res.warning).toBeDefined();
   });
 
   test('no impacts triggers core.setFailed', async () => {
@@ -133,8 +137,9 @@ describe('getImpactFromGithub - concise scenarios', () => {
       head: { ref: 'x', sha: 's' },
       labels: [],
     } as any;
-    const res = await getImpactFromGithub(pr, 'token');
-    expect(res.finalImpact).toBeUndefined();
+  const res = await getImpactFromGithub(pr, []);
+  // finalImpact may be undefined; ensure undefined still expected
+  expect(res.finalImpact).toBeUndefined();
     expect(coreMock.setFailed).toHaveBeenCalledWith('No Impact determined.');
   });
 
@@ -323,7 +328,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
       await (jest as any).unstable_mockModule(
         '../src/conventional_commits.js',
         () => ({
-          getConventionalImpact: () => 1,
+          getConventionalImpact: () => ({ type: 'fix', impact: 1 }),
         }),
       );
       // @ts-ignore
@@ -385,7 +390,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
       await (jest as any).unstable_mockModule(
         '../src/conventional_commits.js',
         () => ({
-          getConventionalImpact: () => 1,
+          getConventionalImpact: () => ({ type: 'fix', impact: 1 }),
         }),
       );
 

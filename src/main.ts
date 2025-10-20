@@ -2,18 +2,11 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import * as gh from './github.js';
 import type { Commit, PullRequest, Tag } from './github.js';
-import { Impact, SemanticVersion } from './semver.js';
+import { SemanticVersion } from './semver.js';
 import { getConventionalImpact } from './conventional_commits.js';
+import { Impact, ImpactResult, ParsedCommitInfo } from './types.js';
 import { generateReleaseNotes } from './release_notes.js';
 import { writeFile } from 'fs/promises';
-
-export type ImpactResult = {
-  prImpact?: Impact;
-  commitImpacts: Impact[];
-  maxCommitImpact?: Impact;
-  finalImpact?: Impact;
-  warning?: string;
-};
 
 export async function getImpactFromGithub(
   pr: PullRequest,
@@ -22,7 +15,7 @@ export async function getImpactFromGithub(
   const pr_impact = getConventionalImpact(pr.title, pr.body);
   core.info(`Determined impact from Pull request: ${String(pr_impact)}`);
 
-  const commit_impacts: Impact[] = [];
+  const commit_impacts: ParsedCommitInfo[] = [];
   // Parse each commit title
   for (const commit of commits) {
     const commit_impact = getConventionalImpact(commit.title, commit.body);
@@ -35,23 +28,23 @@ export async function getImpactFromGithub(
 
   const max_commit_impact =
     commit_impacts.length > 0
-      ? (Math.max(...commit_impacts) as Impact)
+      ? (Math.max(...commit_impacts.map((c) => c.impact)) as Impact)
       : undefined;
   core.info(`Maximum impact from commits: ${String(max_commit_impact)}`);
 
-  let final_impact: Impact | undefined = undefined;
+  let final_impact: ParsedCommitInfo | undefined = undefined;
   let warning: string | undefined = undefined;
   if (
     pr_impact !== undefined &&
     max_commit_impact !== undefined &&
-    pr_impact != max_commit_impact
+    pr_impact.impact != max_commit_impact
   ) {
-    warning = `Impact from PR title (${Impact[pr_impact]}) differs from maximum commit impact (${Impact[max_commit_impact]}). Using PR title impact (${Impact[pr_impact]}) for version bump.`;
+    warning = `Impact from PR title (${Impact[pr_impact.impact]}) differs from maximum commit impact (${Impact[max_commit_impact]}). Using PR title impact (${Impact[pr_impact.impact]}) for version bump.`;
     core.warning(
-      `Impact from PR title (${Impact[pr_impact]}) differs from maximum commit impact (${Impact[max_commit_impact]}).`,
+      `Impact from PR title (${Impact[pr_impact.impact]}) differs from maximum commit impact (${Impact[max_commit_impact]}).`,
     );
     core.warning(
-      `Using PR commit impact (${Impact[pr_impact]}) for version bump.`,
+      `Using PR commit impact (${Impact[pr_impact.impact]}) for version bump.`,
     );
     final_impact = pr_impact;
   } else if (pr_impact !== undefined) {
@@ -61,7 +54,7 @@ export async function getImpactFromGithub(
     core.info(
       `Using maximum commit impact (${max_commit_impact}) for version bump.`,
     );
-    final_impact = max_commit_impact;
+    final_impact = commit_impacts.find((c) => c.impact === max_commit_impact);
   } else {
     core.error(
       `No conventional commit impacts found in PR title or commits; no version bump will be performed.`,
@@ -185,10 +178,12 @@ export async function write_job_summary(
 ) {
   try {
     const prImpactStr =
-      impactRes.prImpact !== undefined ? Impact[impactRes.prImpact] : 'none';
+      impactRes.prImpact !== undefined
+        ? Impact[impactRes.prImpact.impact]
+        : 'none';
     const commitImpactsStr =
       impactRes.commitImpacts && impactRes.commitImpacts.length > 0
-        ? impactRes.commitImpacts.map((i) => Impact[i]).join(', ')
+        ? impactRes.commitImpacts.map((i) => Impact[i.impact]).join(', ')
         : 'none';
     const finalImpactStr = impact !== undefined ? Impact[impact] : 'none';
 
@@ -253,10 +248,15 @@ export async function run() {
 
     const commits = await gh.getPrCommits(token);
     const impactRes = await getImpactFromGithub(pr, commits);
-    if (!impactRes || impactRes.finalImpact === undefined) {
+    if (
+      !impactRes ||
+      impactRes == undefined ||
+      impactRes.finalImpact == undefined
+    ) {
+      core.info('No impact determined; skipping version bump.');
       return;
     }
-    const impact = impactRes.finalImpact;
+    const impact = impactRes.finalImpact.impact;
     // Compute the bumped base version first so we can reason about prereleases
     const bumped_base_version = last_release_version.bump(impact);
 

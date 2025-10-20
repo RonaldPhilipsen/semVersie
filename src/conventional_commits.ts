@@ -1,5 +1,10 @@
 import * as core from '@actions/core';
-import { Impact } from './semver.js';
+import {
+  Impact,
+  ConventionalCommitType,
+  ParsedCommitInfo,
+  TypeToImpactMapping,
+} from './types.js';
 
 /**
  * Maps conventional commit types to the corresponding BumpType used by the versioning logic.
@@ -21,30 +26,26 @@ import { Impact } from './semver.js';
  *
  * @readonly
  */
-const TypeToImpactMapping = {
-  docs: Impact.NOIMPACT,
-  style: Impact.NOIMPACT,
-  test: Impact.NOIMPACT,
-  chore: Impact.NOIMPACT,
-  build: Impact.NOIMPACT,
-  ci: Impact.NOIMPACT,
-  refactor: Impact.PATCH,
-  fix: Impact.PATCH,
-  perf: Impact.PATCH,
-  feat: Impact.MINOR,
-};
 
 export function getConventionalImpact(
   title: string,
   body: string | undefined,
-): Impact | undefined {
-  let impact = undefined;
-  if (body) {
-    impact = ParseConventionalBody(body);
+): ParsedCommitInfo | undefined {
+  const impact = ParseConventionalTitle(title);
+  if (!impact) {
+    core.info(
+      'Title did not conform to Conventional Commits, no impact determined',
+    );
+    return undefined;
   }
-
-  if (impact === undefined) {
-    impact = ParseConventionalTitle(title);
+  if (body) {
+    const body_impact = ParseConventionalBody(body);
+    if (body_impact && body_impact > impact.impact) {
+      core.info(
+        `Body indicates higher impact (${Impact[body_impact]}) than title (${Impact[impact.impact]}), using body impact`,
+      );
+      impact.impact = body_impact;
+    }
   }
   return impact;
 }
@@ -66,7 +67,9 @@ export function ParseConventionalBody(body: string) {
  * <type>[optional scope]: <description>
  * @param title PR title string
  */
-export function ParseConventionalTitle(title: string) {
+export function ParseConventionalTitle(
+  title: string,
+): ParsedCommitInfo | undefined {
   // Use a real RegExp so named capture groups work
   const re =
     /^(?<type>\w+)(?:\((?<scope>[^)]+)\))?(?<breaking>!)?:\s*(?<description>.*)$/;
@@ -85,11 +88,17 @@ export function ParseConventionalTitle(title: string) {
   }
   const breaking = match.groups?.['breaking'];
   core.debug(`Extracted commit type: ${commit_type}`);
-  const key = commit_type as keyof typeof TypeToImpactMapping;
-  let impact = TypeToImpactMapping[key];
+  const type = commit_type as ConventionalCommitType;
+  if (!(type in TypeToImpactMapping)) {
+    core.error(
+      `Commit type '${type}' not recognized in Conventional Commits mapping`,
+    );
+    return undefined;
+  }
+  let impact = TypeToImpactMapping[type];
   if (breaking) {
     core.debug("Detected breaking change indicator '!' in title");
     impact = Impact.MAJOR;
   }
-  return impact;
+  return { type, impact };
 }
