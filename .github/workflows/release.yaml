@@ -114,7 +114,7 @@ jobs:
             --title "${{ needs.unnamed_versioning_tool.outputs.tag }}" \
             --notes-file "${{ needs.unnamed_versioning_tool.outputs.release-notes-file }}" \
             $([[ "${{ needs.unnamed_versioning_tool.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
-      # - name: clean up branch
-      #   if: always()
-      #   run: |
-      #     git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}
+      - name: clean up branch
+        if: always()
+        run: |
+          git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}

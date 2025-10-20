@@ -122,11 +122,31 @@ export async function getAllRCsSinceLatestRelease(
     const owner = ctx.repo.owner;
     const repo = ctx.repo.repo;
     const octokit = github.getOctokit(token);
-
-    // List tags and collect RC tags newer than baseline
+    // We'll collect RC-like identifiers from both tags and releases, dedupe by
+    // name and return any that are newer than the baseline. Using both
+    // sources avoids missing previously-created RCs that exist as releases
+    // (which can happen when a previous run created a release but the tag
+    // listing did not reveal it for some reason).
     const per_page = 100;
-    let page = 1;
     const results: Tag[] = [];
+    const seen = new Set<string>();
+
+    function considerName(name: string | undefined) {
+      if (!name) return;
+      if (seen.has(name)) return;
+      const parsed = SemanticVersion.parse(name);
+      if (!parsed) return;
+      if (!parsed.prerelease) return;
+      if (!parsed.prerelease.toLowerCase().includes('rc')) return;
+      const cmp = SemanticVersion.compare(parsed, baseline);
+      if (cmp < 0) return; // skip older
+      seen.add(name);
+      // preserve the original object shape where possible; at minimum include name
+      results.push({ name });
+    }
+
+    // Fetch tag names (paged)
+    let page = 1;
     while (true) {
       const res = await octokit.rest.repos.listTags({
         owner,
@@ -135,32 +155,33 @@ export async function getAllRCsSinceLatestRelease(
         page,
       });
       if (!res || !Array.isArray(res.data) || res.data.length === 0) break;
-
       for (const t of res.data as Tag[]) {
-        const parsed = SemanticVersion.parse(t.name);
-        if (!parsed) continue;
-        // Require a prerelease component that indicates an RC
-        if (!parsed.prerelease) continue;
-        if (!parsed.prerelease.toLowerCase().includes('rc')) continue;
-
-        const cmp = SemanticVersion.compare(parsed, baseline);
-        if (cmp < 0) {
-          // We've reached tags older than the baseline — tags are expected
-          // to be returned newest-first, so we can stop paging further.
-          core.debug(`Encountered older tag ${t.name}; stopping search.`);
-          return results;
-        }
-        if (cmp === 0) continue; // equal to baseline, skip
-        // cmp > 0 -> newer than baseline
-        results.push(t);
+        considerName(t.name);
       }
+      if (res.data.length < per_page) break;
+      page += 1;
+    }
 
+    // Fetch releases (paged) and consider their tag_name or name
+    page = 1;
+    while (true) {
+      const res = await octokit.rest.repos.listReleases({
+        owner,
+        repo,
+        per_page,
+        page,
+      });
+      if (!res || !Array.isArray(res.data) || res.data.length === 0) break;
+      for (const r of res.data) {
+        // Release may have tag_name or a name; prefer tag_name then name
+        considerName(r.tag_name ?? r.name);
+      }
       if (res.data.length < per_page) break;
       page += 1;
     }
 
     core.info(
-      `Found ${results.length} release-candidate tag(s) since latest release`,
+      `Found ${results.length} release-candidate entry(s) since latest release`,
     );
     return results;
   } catch (err) {
