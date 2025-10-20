@@ -6,6 +6,8 @@ on:
       - opened
       - closed
       - edited
+      - labeled
+      - unlabeled
       - synchronize
     branches:
       - main
@@ -36,6 +38,7 @@ jobs:
         with:
           node-version: '24'
       - name: Cache node modules
+        timeout-minutes: 5
         uses: actions/cache@v4
         with:
           path: node_modules
@@ -44,6 +47,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-modules-
       - name: setup dependencies
+        timeout-minutes: 5
         run: npm install
       - name: build distribution
         run: npm run build
@@ -73,6 +77,7 @@ jobs:
         with:
           node-version: '24'
       - name: Cache node modules
+        timeout-minutes: 5
         uses: actions/cache@v4
         with:
           path: node_modules
@@ -91,8 +96,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git switch -c release-${{ needs.unnamed_versioning_tool.outputs.version }}
-          git add -f dist/*
-          git commit -am "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
+          # temporarily unignore dist/ to commit built files
+          git add dist/ dist/index.js dist/package.json package.json package-lock.json
+          git commit -m "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
           git push --set-upstream origin release-${{ needs.unnamed_versioning_tool.outputs.version }}
       - name: download release notes artifact
         uses: actions/download-artifact@v4
@@ -107,7 +113,7 @@ jobs:
             --title "${{ needs.unnamed_versioning_tool.outputs.tag }}" \
             --notes-file "${{ needs.unnamed_versioning_tool.outputs.release-notes-file }}" \
             $([[ "${{ needs.unnamed_versioning_tool.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
-      - name: clean up branch
-        if: always()
-        run: |
-          git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}
+      # - name: clean up branch
+      #   if: always()
+      #   run: |
+      #     git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}

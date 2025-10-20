@@ -1,6 +1,6 @@
 import { Commit } from './github.js';
 import { getConventionalImpact } from './conventional_commits.js';
-import { Impact } from './semver.js';
+import { Impact } from './types.js';
 
 function getReleaseNoteSection(title: string, commits: Commit[]): string[] {
   const lines: string[] = [];
@@ -17,11 +17,12 @@ export function generateReleaseNotes(commits: Commit[]): string {
   const breaking: Commit[] = [];
   const features: Commit[] = [];
   const fixes: Commit[] = [];
+
   const others: Commit[] = [];
 
   for (const commit of commits) {
     const commit_impact = getConventionalImpact(commit.title, commit.body);
-    switch (commit_impact) {
+    switch (commit_impact?.impact) {
       case Impact.MAJOR:
         breaking.push(commit);
         break;
@@ -29,7 +30,20 @@ export function generateReleaseNotes(commits: Commit[]): string {
         features.push(commit);
         break;
       case Impact.PATCH:
-        fixes.push(commit);
+        switch (commit_impact.type) {
+          case 'fix':
+            fixes.push(commit);
+            break;
+          case 'perf':
+            others.push(commit);
+            break;
+          case 'refactor':
+            others.push(commit);
+            break;
+          default:
+            others.push(commit);
+            break;
+        }
         break;
       default:
         others.push(commit);

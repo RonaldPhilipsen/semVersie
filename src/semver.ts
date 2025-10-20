@@ -1,11 +1,5 @@
 import * as core from '@actions/core';
-
-export enum Impact {
-  NOIMPACT,
-  PATCH,
-  MINOR,
-  MAJOR,
-}
+import { Impact } from './types.js';
 
 export class SemanticVersion {
   major: number;

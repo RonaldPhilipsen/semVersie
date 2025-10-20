@@ -1,4 +1,5 @@
-import { SemanticVersion, Impact } from '../src/semver';
+import { SemanticVersion } from '../src/semver';
+import { Impact } from '../src/types';
 
 describe('SemanticVersion.bump', () => {
   test('major bump resets minor and patch', () => {
