@@ -9,37 +9,37 @@ import { Impact } from '../src/types.js';
 describe('ParseSemanticTitle', () => {
   test('feat with breaking-change footer => minor/major detection', () => {
     const msg = `feat: allow provided config object to extend other configs`;
-  const res = ParseConventionalTitle(msg);
-  expect(res).toBeDefined();
-  expect(res!.impact).toBeDefined();
-  // Parser returns a ParsedCommitInfo; check impact and type
-  expect(res!.impact).toBe(Impact.MINOR);
-  expect(res!.type).toBe('feat');
+    const res = ParseConventionalTitle(msg);
+    expect(res).toBeDefined();
+    expect(res!.impact).toBeDefined();
+    // Parser returns a ParsedCommitInfo; check impact and type
+    expect(res!.impact).toBe(Impact.MINOR);
+    expect(res!.type).toBe('feat');
   });
 
   test('feat! (breaking) => major', () => {
     const msg = `feat!: send an email to the customer when a product is shipped`;
-  const res = ParseConventionalTitle(msg);
-  expect(res).toBeDefined();
-  expect(res!.impact).toBeDefined();
-  expect(res!.impact).toBe(Impact.MAJOR);
-  expect(res!.type).toBe('feat');
+    const res = ParseConventionalTitle(msg);
+    expect(res).toBeDefined();
+    expect(res!.impact).toBeDefined();
+    expect(res!.impact).toBe(Impact.MAJOR);
+    expect(res!.type).toBe('feat');
   });
 
   test('feat(scope)! (breaking) => major', () => {
     const msg = `feat(api)!: send an email to the customer when a product is shipped`;
-  const res = ParseConventionalTitle(msg);
-  expect(res).toBeDefined();
-  expect(res!.impact).toBe(Impact.MAJOR);
-  expect(res!.type).toBe('feat');
+    const res = ParseConventionalTitle(msg);
+    expect(res).toBeDefined();
+    expect(res!.impact).toBe(Impact.MAJOR);
+    expect(res!.type).toBe('feat');
   });
 
   test('chore! with breaking footer => major', () => {
     const msg = `chore!: drop support for old browsers`;
-  const res = ParseConventionalTitle(msg);
-  expect(res).toBeDefined();
-  expect(res!.impact).toBe(Impact.MAJOR);
-  expect(res!.type).toBe('chore');
+    const res = ParseConventionalTitle(msg);
+    expect(res).toBeDefined();
+    expect(res!.impact).toBe(Impact.MAJOR);
+    expect(res!.type).toBe('chore');
   });
 });
 

@@ -15,8 +15,15 @@ inputs:
 outputs:
   release:
     description: Whether a release should be created (true/false)
+  release-notes:
+    description: |
+      The generated release notes for the new version in markdown format
   release-notes-file:
-    description: The generated release notes for the new version
+    description: |
+      The generated release notes for the new version, useful if you have many
+      lines
+
+  # Semantic versioning outputs
   prerelease:
     description: Whether the new version is a prerelease (true/false)
   tag:

@@ -44,16 +44,14 @@ export async function getImpactFromGithub(
       `Impact from PR title (${Impact[pr_impact.impact]}) differs from maximum commit impact (${Impact[max_commit_impact]}).`,
     );
     core.warning(
-      `Using PR commit impact (${Impact[pr_impact.impact]}) for version bump.`,
+      `Using PR title impact (${Impact[pr_impact.impact]}) for version bump.`,
     );
     final_impact = pr_impact;
   } else if (pr_impact !== undefined) {
-    core.info(`Using PR title impact (${pr_impact}) for version bump.`);
+    core.info(`Using PR title impact (${Impact[pr_impact.impact]}) for version bump.`);
     final_impact = pr_impact;
   } else if (max_commit_impact !== undefined) {
-    core.info(
-      `Using maximum commit impact (${max_commit_impact}) for version bump.`,
-    );
+    core.info(`Using maximum commit impact (${Impact[max_commit_impact]}) for version bump.`);
     final_impact = commit_impacts.find((c) => c.impact === max_commit_impact);
   } else {
     core.error(
@@ -76,11 +74,6 @@ export async function handle_release_candidates(
   pr: PullRequest,
   impact: Impact,
   last_release_version: SemanticVersion,
-  // optional fetcher to allow tests to inject previous RCs
-  fetchRCs?: (
-    token: string,
-    baseline: SemanticVersion,
-  ) => Promise<{ name: string }[]>,
 ) {
   let prerelease = undefined;
   const is_prerelease = pr.labels?.some(
@@ -93,13 +86,17 @@ export async function handle_release_candidates(
 
   if (is_prerelease) {
     core.info('PR is marked as a release candidate.');
-    const previous_release_candidates = await (fetchRCs
-      ? fetchRCs(token, last_release_version)
-      : getAllRCsSinceLatestRelease(token, last_release_version));
     // Determine the bumped base version (without prerelease) according to impact
     const bumped_base = last_release_version.bump(impact);
+    // Fetch previous RCs for the bumped base version. We pass the bumped base
+    // as the baseline so that RC tags targeting the bumped version are found
+    // even if they were created before the latest release.
+    const previous_release_candidates = await getAllRCsSinceLatestRelease(
+      token,
+      bumped_base,
+    );
     // Extract tag names and ask SemanticVersion to compute the next RC index
-    const tagNames = previous_release_candidates.map((t) => t.name);
+    const tagNames = previous_release_candidates.map((t: Tag) => t.name);
     const nextRc = SemanticVersion.nextRcIndex(bumped_base, tagNames);
     // create the prerelease string e.g. 'rc1' (if nextRc is 1) or 'rc0' if 0
     prerelease = `rc${nextRc}`;
@@ -122,11 +119,42 @@ export async function getAllRCsSinceLatestRelease(
     const owner = ctx.repo.owner;
     const repo = ctx.repo.repo;
     const octokit = github.getOctokit(token);
-
-    // List tags and collect RC tags newer than baseline
+    // We'll collect RC-like identifiers from both tags and releases, dedupe by
+    // name and return any that are newer than the baseline. Using both
+    // sources avoids missing previously-created RCs that exist as releases
+    // (which can happen when a previous run created a release but the tag
+    // listing did not reveal it for some reason).
     const per_page = 100;
-    let page = 1;
     const results: Tag[] = [];
+    const seen = new Set<string>();
+
+    function considerName(name: string | undefined) {
+      if (!name) return;
+      if (seen.has(name)) return;
+      const parsed = SemanticVersion.parse(name);
+      if (!parsed) return;
+      if (!parsed.prerelease) return;
+      if (!parsed.prerelease.toLowerCase().includes('rc')) return;
+      const cmp = SemanticVersion.compare(parsed, baseline);
+
+      if (cmp <= 0) {
+        if (
+          parsed.major === baseline.major &&
+          parsed.minor === baseline.minor &&
+          parsed.patch === baseline.patch
+        ) {
+          // allow RC targeting same base version even if cmp < 0
+        } else {
+          return; // skip older
+        }
+      }
+      seen.add(name);
+      // preserve the original object shape where possible; at minimum include name
+      results.push({ name });
+    }
+
+    // Fetch tag names (paged)
+    let page = 1;
     while (true) {
       const res = await octokit.rest.repos.listTags({
         owner,
@@ -135,32 +163,33 @@ export async function getAllRCsSinceLatestRelease(
         page,
       });
       if (!res || !Array.isArray(res.data) || res.data.length === 0) break;
-
       for (const t of res.data as Tag[]) {
-        const parsed = SemanticVersion.parse(t.name);
-        if (!parsed) continue;
-        // Require a prerelease component that indicates an RC
-        if (!parsed.prerelease) continue;
-        if (!parsed.prerelease.toLowerCase().includes('rc')) continue;
-
-        const cmp = SemanticVersion.compare(parsed, baseline);
-        if (cmp < 0) {
-          // We've reached tags older than the baseline — tags are expected
-          // to be returned newest-first, so we can stop paging further.
-          core.debug(`Encountered older tag ${t.name}; stopping search.`);
-          return results;
-        }
-        if (cmp === 0) continue; // equal to baseline, skip
-        // cmp > 0 -> newer than baseline
-        results.push(t);
+        considerName(t.name);
       }
+      if (res.data.length < per_page) break;
+      page += 1;
+    }
 
+    // Fetch releases (paged) and consider their tag_name or name
+    page = 1;
+    while (true) {
+      const res = await octokit.rest.repos.listReleases({
+        owner,
+        repo,
+        per_page,
+        page,
+      });
+      if (!res || !Array.isArray(res.data) || res.data.length === 0) break;
+      for (const r of res.data) {
+        // Release may have tag_name or a name; prefer tag_name then name
+        considerName(r.tag_name ?? r.name);
+      }
       if (res.data.length < per_page) break;
       page += 1;
     }
 
     core.info(
-      `Found ${results.length} release-candidate tag(s) since latest release`,
+      `Found ${results.length} release-candidate entry(s) since latest release`,
     );
     return results;
   } catch (err) {
@@ -290,6 +319,16 @@ export async function run() {
       'release',
       (pr.merged && impact !== Impact.NOIMPACT) || prerelease !== undefined,
     );
+
+    if (release_notes.length < 10000) {
+      core.setOutput('release-notes', release_notes);
+    } else {
+      core.error(
+        `Release notes length (${release_notes.length}) exceeds 10,000 characters, Refusing to populate output. 
+        Consider using the 'release-notes-file' output for large release notes.`,
+      );
+    }
+
     core.setOutput('release-notes-file', filePath);
     core.setOutput('prerelease', prerelease !== undefined);
     core.setOutput('tag', new_version.as_tag());

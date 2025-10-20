@@ -55,13 +55,13 @@ describe('getImpactFromGithub - concise scenarios', () => {
 
     const mod = await import('../src/main');
     const { getImpactFromGithub } = mod;
-  const res = await getImpactFromGithub(pr, await mockedGetPrCommits());
-  // finalImpact is now a ParsedCommitInfo, so check its .impact
-  expect(res.finalImpact?.impact).toBe(Impact.PATCH);
-  // commitImpacts is an array of ParsedCommitInfo; map to impacts
-  const impacts = res.commitImpacts.map((c: any) => c.impact);
-  expect(impacts).toContain(Impact.NOIMPACT);
-  expect(impacts).toContain(Impact.PATCH);
+    const res = await getImpactFromGithub(pr, await mockedGetPrCommits());
+    // finalImpact is now a ParsedCommitInfo, so check its .impact
+    expect(res.finalImpact?.impact).toBe(Impact.PATCH);
+    // commitImpacts is an array of ParsedCommitInfo; map to impacts
+    const impacts = res.commitImpacts.map((c: any) => c.impact);
+    expect(impacts).toContain(Impact.NOIMPACT);
+    expect(impacts).toContain(Impact.PATCH);
   });
 
   test('PR title impact can override higher commit impact and warns', async () => {
@@ -104,9 +104,9 @@ describe('getImpactFromGithub - concise scenarios', () => {
       head: { ref: 'x', sha: 's' },
       labels: [],
     } as any;
-  const res = await getImpactFromGithub(pr, await mockedGetPrCommits());
-  expect(res.finalImpact?.impact).toBe(Impact.PATCH);
-  expect(res.warning).toBeDefined();
+    const res = await getImpactFromGithub(pr, await mockedGetPrCommits());
+    expect(res.finalImpact?.impact).toBe(Impact.PATCH);
+    expect(res.warning).toBeDefined();
   });
 
   test('no impacts triggers core.setFailed', async () => {
@@ -137,9 +137,9 @@ describe('getImpactFromGithub - concise scenarios', () => {
       head: { ref: 'x', sha: 's' },
       labels: [],
     } as any;
-  const res = await getImpactFromGithub(pr, []);
-  // finalImpact may be undefined; ensure undefined still expected
-  expect(res.finalImpact).toBeUndefined();
+    const res = await getImpactFromGithub(pr, []);
+    // finalImpact may be undefined; ensure undefined still expected
+    expect(res.finalImpact).toBeUndefined();
     expect(coreMock.setFailed).toHaveBeenCalledWith('No Impact determined.');
   });
 
@@ -435,14 +435,67 @@ describe('getImpactFromGithub - concise scenarios', () => {
     } as any;
     // @ts-ignore
     await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('../src/github.js', () => ({
+      getAllRCsSinceLatestRelease: async () => [
+        { name: 'v1.3.0-rc.0' },
+        { name: 'v1.3.0-rc.1' },
+      ],
+    }));
+
     const mod = await import('../src/main');
     const { handle_release_candidates } = mod as any;
-    const fetcher = jest
-      .fn()
-      .mockResolvedValue([{ name: 'v1.3.0-rc.0' }, { name: 'v1.3.0-rc.1' }]);
-    const pr = { labels: [{ name: 'release-candidate' }] } as any;
+    const pr = {
+      labels: [{ name: 'release-candidate' }],
+    } as any;
     const last = new (await import('../src/semver')).SemanticVersion(1, 2, 0);
-    const rc = await handle_release_candidates('tok', pr, 2, last, fetcher);
+    const rc = await handle_release_candidates('tok', pr, 2, last);
+    expect(rc).toMatch(/^rc\d+$/);
+  });
+
+  test('handle_release_candidates creates rc for NOIMPACT bump when previous RCs exist', async () => {
+    jest.resetModules();
+    const coreMock = {
+      info: jest.fn(),
+      debug: jest.fn(),
+      warning: jest.fn(),
+      error: jest.fn(),
+      setFailed: jest.fn(),
+      getInput: jest.fn(),
+      setOutput: jest.fn(),
+      summary: {
+        addHeading: jest.fn(() => ({
+          addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+        })),
+        write: jest.fn(),
+      },
+    } as any;
+
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('../src/github.js', () => ({
+      getAllRCsSinceLatestRelease: async () => [
+        { name: 'v1.2.0-rc.0' },
+        { name: 'v1.2.0-rc.1' },
+      ],
+    }));
+
+    const mod = await import('../src/main');
+    const { handle_release_candidates } = mod as any;
+
+    const pr = {
+      labels: [{ name: 'release-candidate' }],
+      merged: false,
+    } as any;
+    // last release is v1.2.0; since impact is NOIMPACT the bumped base remains 1.2.0
+    const last = new (await import('../src/semver')).SemanticVersion(1, 2, 0);
+
+    // impact = NOIMPACT (0)
+    const rc = await handle_release_candidates('tok', pr, 0, last);
+
+    // Should return an rc suffix (next index). Exact index depends on
+    // mocked environment; ensure it's an rc token.
     expect(rc).toMatch(/^rc\d+$/);
   });
 

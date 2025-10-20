@@ -24,8 +24,7 @@ jobs:
       contents: read
     outputs:
       release: ${{ steps.unnamed_versioning_tool.outputs.release }}
-      release-notes-file:
-        ${{ steps.unnamed_versioning_tool.outputs.release-notes-file }}
+      release-notes: ${{ steps.unnamed_versioning_tool.outputs.release-notes }}
       prerelease: ${{ steps.unnamed_versioning_tool.outputs.prerelease }}
       tag: ${{ steps.unnamed_versioning_tool.outputs.tag }}
       version: ${{ steps.unnamed_versioning_tool.outputs.version }}
@@ -56,12 +55,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         uses: ./
-      - name: Upload Release Notes Artifact
-        if: steps.unnamed_versioning_tool.outputs.release == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-notes
-          path: ${{ steps.unnamed_versioning_tool.outputs.release-notes-file }}
 
   release:
     name: Create Release
@@ -97,23 +90,19 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git switch -c release-${{ needs.unnamed_versioning_tool.outputs.version }}
           # temporarily unignore dist/ to commit built files
-          git add dist/ dist/index.js dist/package.json package.json package-lock.json
+          git add --force dist/ dist/index.js dist/package.json package.json package-lock.json
+          git status
           git commit -m "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
           git push --set-upstream origin release-${{ needs.unnamed_versioning_tool.outputs.version }}
-      - name: download release notes artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: release-notes
-          path: .
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create ${{ needs.unnamed_versioning_tool.outputs.tag }} \
             --title "${{ needs.unnamed_versioning_tool.outputs.tag }}" \
-            --notes-file "${{ needs.unnamed_versioning_tool.outputs.release-notes-file }}" \
+            --notes "${{ needs.unnamed_versioning_tool.outputs.release-notes }}" \
             $([[ "${{ needs.unnamed_versioning_tool.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
-      # - name: clean up branch
-      #   if: always()
-      #   run: |
-      #     git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}
+      - name: clean up branch
+        if: always()
+        run: |
+          git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}
