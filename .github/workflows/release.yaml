@@ -6,6 +6,8 @@ on:
       - opened
       - closed
       - edited
+      - labeled
+      - unlabeled
       - synchronize
     branches:
       - main
@@ -94,9 +96,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git switch -c release-${{ needs.unnamed_versioning_tool.outputs.version }}
-          sed -i '/\/dist\/d' .gitignore # temporarily unignore dist/ to commit built files
+          # temporarily unignore dist/ to commit built files
+          # use a sed command with proper quoting so the CI shell interprets it correctly
+          sed -i '/^dist\//d' .gitignore
           git add dist/ dist/index.js dist/package.json
-          git commit -am "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
+          git commit -m "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
           git push --set-upstream origin release-${{ needs.unnamed_versioning_tool.outputs.version }}
       - name: download release notes artifact
         uses: actions/download-artifact@v4
@@ -111,7 +115,7 @@ jobs:
             --title "${{ needs.unnamed_versioning_tool.outputs.tag }}" \
             --notes-file "${{ needs.unnamed_versioning_tool.outputs.release-notes-file }}" \
             $([[ "${{ needs.unnamed_versioning_tool.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
-      - name: clean up branch
-        if: always()
-        run: |
-          git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}
+      # - name: clean up branch
+      #   if: always()
+      #   run: |
+      #     git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}
