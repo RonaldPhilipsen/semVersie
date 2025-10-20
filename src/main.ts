@@ -311,6 +311,16 @@ export async function run() {
       'release',
       (pr.merged && impact !== Impact.NOIMPACT) || prerelease !== undefined,
     );
+
+    if (release_notes.length < 10000) {
+      core.setOutput('release-notes', release_notes);
+    } else {
+      core.error(
+        `Release notes length (${release_notes.length}) exceeds 10,000 characters, Refusing to populate output. 
+        Consider using the 'release-notes-file' output for large release notes.`,
+      );
+    }
+
     core.setOutput('release-notes-file', filePath);
     core.setOutput('prerelease', prerelease !== undefined);
     core.setOutput('tag', new_version.as_tag());
