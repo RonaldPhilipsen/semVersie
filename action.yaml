@@ -12,6 +12,10 @@ inputs:
     description: Build metadata to append to the version, e.g. "build_45"
     required: false
     default: ''
+  release-notes-format:
+    description: Path to a format file to brand the release notes
+    required: false
+    default: ''
 outputs:
   release:
     description: Whether a release should be created (true/false)

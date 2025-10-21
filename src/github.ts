@@ -1,5 +1,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import { readFile, access } from 'fs/promises';
+import { constants } from 'fs';
 import { LRUCache } from './utils.js';
 
 export type Commit = { sha: string; title: string; body?: string };
@@ -284,5 +286,61 @@ export async function createRelease(
   } catch (err) {
     core.debug(`createRelease failed: ${String(err)}`);
     throw Error('Failed to create release');
+  }
+}
+
+/**
+ * Downloads a file from the GitHub repository.
+ * First checks if the file exists locally, if not attempts to download from GitHub.
+ *
+ * @param token GitHub token for API access
+ * @param filePath Path to the file in the repository (e.g., 'path/to/file.md')
+ * @returns The file contents as a string, or undefined if file not found
+ */
+export async function getFileContent(
+  token: string,
+  filePath: string,
+): Promise<string | undefined> {
+  try {
+    // First, check if file exists locally
+    try {
+      await access(filePath, constants.F_OK);
+      core.info(`Found file locally: ${filePath}`);
+      const content = await readFile(filePath, 'utf8');
+      return content;
+    } catch {
+      // File doesn't exist locally, try to download from GitHub
+      core.info(
+        `File not found locally, attempting to download from GitHub: ${filePath}`,
+      );
+    }
+
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+
+    const response = await octokit.rest.repos.getContent({
+      owner,
+      repo,
+      path: filePath,
+    });
+
+    // GitHub API returns base64 encoded content for files
+    if (
+      'content' in response.data &&
+      typeof response.data.content === 'string'
+    ) {
+      const content = Buffer.from(response.data.content, 'base64').toString(
+        'utf8',
+      );
+      core.info(`Successfully downloaded file from GitHub: ${filePath}`);
+      return content;
+    } else {
+      core.warning(
+        `File ${filePath} is not a regular file or content not available`,
+      );
+      return undefined;
+    }
+  } catch (err) {
+    core.warning(`Failed to get file content for ${filePath}: ${String(err)}`);
+    return undefined;
   }
 }

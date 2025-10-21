@@ -54,6 +54,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         uses: ./
+        with:
+          release-notes-format: 'docs/resources/release-format.md'
 
   release:
     name: Create Release
@@ -85,22 +87,22 @@ jobs:
       - name: Commit version bump
         if: needs.semVersie.outputs.release == 'true'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
           git switch -c release-${{ needs.semVersie.outputs.version }}
           # temporarily unignore dist/ to commit built files
           git add --force dist/ dist/index.js dist/package.json package.json package-lock.json
           git status
-          git commit -m "chore: bump version to ${{ needs.semVersie.outputs.version }}"
+          git commit -m 'chore: bump version to ${{ needs.semVersie.outputs.version }}'
           git push --set-upstream origin release-${{ needs.semVersie.outputs.version }}
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create ${{ needs.semVersie.outputs.tag }} \
-            --title "${{ needs.semVersie.outputs.tag }}" \
-            --notes "${{ needs.semVersie.outputs.release-notes }}" \
-            $([[ "${{ needs.semVersie.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
+            --title '${{ needs.semVersie.outputs.tag }}' \
+            --notes '${{ needs.semVersie.outputs.release-notes }}' \
+            $([[ '${{ needs.semVersie.outputs.prerelease }}' == 'true' ]] && echo '--prerelease' || echo '')
       - name: clean up branch
         if: always()
         run: |
