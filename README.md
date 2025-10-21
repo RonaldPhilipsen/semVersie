@@ -1,4 +1,4 @@
-<img src="docs/resources/logo/semVersie-final.svg" alt="Versie banner" width="100%" />
+<img src="docs/resources/logo/semversie-final.svg" alt="Versie banner" width="100%" />
 
 # Versie
 
