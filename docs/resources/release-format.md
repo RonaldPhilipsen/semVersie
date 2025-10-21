@@ -2,4 +2,4 @@
 
 <INSERT_RELEASE_NOTES_HERE>
 
-&copy 2025 Ronald Philipsen
+:copyright: 2025 Ronald Philipsen
