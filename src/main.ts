@@ -216,7 +216,7 @@ export async function write_job_summary(
         : 'none';
     const finalImpactStr = impact !== undefined ? Impact[impact] : 'none';
 
-    core.summary.addHeading('unnamed_versioning_tool summary', 2).addTable([
+    core.summary.addHeading('Versie summary', 2).addTable([
       ['Item', 'Value'],
       ['Previous', last_release_version.toString()],
       ['New', `${new_version.toString()}`],

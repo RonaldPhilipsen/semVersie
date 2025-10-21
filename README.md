@@ -1,4 +1,4 @@
-# unnamed_versioning_tool
+# versie
 
 Simple semantic versioning for GitHub Actions and repositories that use
 conventional commits.
@@ -23,6 +23,7 @@ as a job output:
 ```yaml
 jobs:
   version:
+    name: Versie
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -30,8 +31,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Calculate version
-        id: version
-        uses: RonaldPhilipsen/unnamed_versioning_tool@vX.Y.Z
+        id: versie
+        uses: RonaldPhilipsen/Versie@vX.Y.Z
         with:
           # Optional: pass build metadata (e.g. commit SHA)
           build-metadata: ${{ github.sha }}
@@ -51,7 +52,7 @@ Please note that running this action from a non-fixed version is _not_ supported
 | Output               | Description                                                                                   | Example                                                                                       |
 | -------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `release`            | Boolean indicating whether a new release should be created                                    | `true`                                                                                        |
-| `release-notes`      | Generated release notes in markdown                                                           | See [example](https://github.com/RonaldPhilipsen/unnamed_versioning_tool/releases/tag/v1.0.3) |
+| `release-notes`      | Generated release notes in markdown                                                           | See [example](https://github.com/RonaldPhilipsen/versie/releases/tag/v1.0.3) |
 | `release-notes-file` | Generated release notes in markdown, dumped to a file on disk, useful for large release notes |                                                                                               |
 | `prerelease`         | Boolean indicating whether the created release is a prerelease                                | `false`                                                                                       |
 | `tag`                | The semantic version in `tag` format,                                                         | `v1.2.3-rc0`                                                                                  |
