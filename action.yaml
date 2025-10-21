@@ -5,7 +5,7 @@ author: Ronald Philipsen
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
   icon: git-merge
-  color: purple
+  color: gray-dark
 
 inputs:
   build-metadata:

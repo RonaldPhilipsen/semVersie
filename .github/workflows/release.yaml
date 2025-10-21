@@ -28,8 +28,7 @@ jobs:
       prerelease: ${{ steps.versie.outputs.prerelease }}
       tag: ${{ steps.versie.outputs.tag }}
       version: ${{ steps.versie.outputs.version }}
-      version-pep-440:
-        ${{ steps.versie.outputs['version-pep-440'] }}
+      version-pep-440: ${{ steps.versie.outputs['version-pep-440'] }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Node.js

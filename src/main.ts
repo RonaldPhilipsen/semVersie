@@ -48,10 +48,14 @@ export async function getImpactFromGithub(
     );
     final_impact = pr_impact;
   } else if (pr_impact !== undefined) {
-    core.info(`Using PR title impact (${Impact[pr_impact.impact]}) for version bump.`);
+    core.info(
+      `Using PR title impact (${Impact[pr_impact.impact]}) for version bump.`,
+    );
     final_impact = pr_impact;
   } else if (max_commit_impact !== undefined) {
-    core.info(`Using maximum commit impact (${Impact[max_commit_impact]}) for version bump.`);
+    core.info(
+      `Using maximum commit impact (${Impact[max_commit_impact]}) for version bump.`,
+    );
     final_impact = commit_impacts.find((c) => c.impact === max_commit_impact);
   } else {
     core.error(
