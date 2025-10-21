@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="120" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="120" fill="white" rx="8"/>
+  
+  <!-- App name on the LEFT -->
+  <g id="app-name">
+    <text x="20" y="45" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#333">Versie</text>
+    <text x="20" y="65" font-family="Arial, sans-serif" font-size="12" fill="#666">Semantic versioning made easy</text>
+    <text x="20" y="80" font-family="monospace" font-size="10" fill="#888">feat: fix: docs: chore:</text>
+  </g>
+  
+  <!-- Git tree structure on the RIGHT (BIGGER) -->
+  <g id="git-tree">
+    <!-- Main branch line -->
+    <path d="M210 60 L360 60" stroke="#333" stroke-width="4" fill="none"/>
+    
+    <!-- Feature branch -->
+    <path d="M240 60 Q 255 45, 270 30 L 320 30" stroke="#666" stroke-width="3" fill="none"/>
+    <path d="M320 30 Q 335 45, 350 60" stroke="#666" stroke-width="3" fill="none"/>
+    
+    <!-- Release branch -->
+    <path d="M290 60 Q 305 75, 320 90 L 350 90" stroke="#666" stroke-width="3" fill="none"/>
+    
+    <!-- Git nodes (commits) - bigger -->
+    <circle cx="210" cy="60" r="5" fill="#333"/>
+    <circle cx="240" cy="60" r="5" fill="#333"/>
+    <circle cx="270" cy="30" r="4" fill="#666"/>
+    <circle cx="290" cy="60" r="5" fill="#333"/>
+    <circle cx="320" cy="30" r="4" fill="#666"/>
+    <circle cx="320" cy="90" r="4" fill="#666"/>
+    <circle cx="350" cy="60" r="5" fill="#333"/>
+    <circle cx="350" cy="90" r="4" fill="#666"/>
+    
+    <!-- Version tags -->
+    <g id="version-tags">
+      <text x="221" y="51" text-anchor="middle" fill="#333" font-family="monospace" font-size="9" font-weight="bold">v1.0.0</text>
+      
+      <text x="301" y="51" text-anchor="middle" fill="#333" font-family="monospace" font-size="9" font-weight="bold">v1.1.0</text>
+      
+      <text x="361" y="51" text-anchor="middle" fill="#333" font-family="monospace" font-size="9" font-weight="bold">v2.0.0</text>
+    </g>
+  </g>
+</svg>

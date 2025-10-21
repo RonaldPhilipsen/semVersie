@@ -17,19 +17,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unnamed_versioning_tool:
-    name: unnamed_versioning_tool
+  versie:
+    name: Versie
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      release: ${{ steps.unnamed_versioning_tool.outputs.release }}
-      release-notes: ${{ steps.unnamed_versioning_tool.outputs.release-notes }}
-      prerelease: ${{ steps.unnamed_versioning_tool.outputs.prerelease }}
-      tag: ${{ steps.unnamed_versioning_tool.outputs.tag }}
-      version: ${{ steps.unnamed_versioning_tool.outputs.version }}
-      version-pep-440:
-        ${{ steps.unnamed_versioning_tool.outputs['version-pep-440'] }}
+      release: ${{ steps.versie.outputs.release }}
+      release-notes: ${{ steps.versie.outputs.release-notes }}
+      prerelease: ${{ steps.versie.outputs.prerelease }}
+      tag: ${{ steps.versie.outputs.tag }}
+      version: ${{ steps.versie.outputs.version }}
+      version-pep-440: ${{ steps.versie.outputs['version-pep-440'] }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Node.js
@@ -50,19 +49,19 @@ jobs:
         run: npm install
       - name: build distribution
         run: npm run build
-      - id: unnamed_versioning_tool
-        name: unnamed_versioning_tool
+      - id: versie
+        name: versie
         env:
           GITHUB_TOKEN: ${{ github.token }}
         uses: ./
 
   release:
     name: Create Release
-    needs: unnamed_versioning_tool
+    needs: versie
     runs-on: ubuntu-latest
     permissions:
       contents: write # to be able to push commits and create releases
-    if: needs.unnamed_versioning_tool.outputs.release == 'true'
+    if: needs.versie.outputs.release == 'true'
     steps:
       - uses: actions/checkout@v4
       - name: Install Node.js
@@ -80,29 +79,29 @@ jobs:
             ${{ runner.os }}-node-modules-
       - name: update version in package.json
         run: |
-          npm version ${{ needs.unnamed_versioning_tool.outputs.version }} --no-git-tag-version
+          npm version ${{ needs.versie.outputs.version }} --no-git-tag-version
       - name: build distribution
         run: npm run build
       - name: Commit version bump
-        if: needs.unnamed_versioning_tool.outputs.release == 'true'
+        if: needs.versie.outputs.release == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git switch -c release-${{ needs.unnamed_versioning_tool.outputs.version }}
+          git switch -c release-${{ needs.versie.outputs.version }}
           # temporarily unignore dist/ to commit built files
           git add --force dist/ dist/index.js dist/package.json package.json package-lock.json
           git status
-          git commit -m "chore: bump version to ${{ needs.unnamed_versioning_tool.outputs.version }}"
-          git push --set-upstream origin release-${{ needs.unnamed_versioning_tool.outputs.version }}
+          git commit -m "chore: bump version to ${{ needs.versie.outputs.version }}"
+          git push --set-upstream origin release-${{ needs.versie.outputs.version }}
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ needs.unnamed_versioning_tool.outputs.tag }} \
-            --title "${{ needs.unnamed_versioning_tool.outputs.tag }}" \
-            --notes "${{ needs.unnamed_versioning_tool.outputs.release-notes }}" \
-            $([[ "${{ needs.unnamed_versioning_tool.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
+          gh release create ${{ needs.versie.outputs.tag }} \
+            --title "${{ needs.versie.outputs.tag }}" \
+            --notes "${{ needs.versie.outputs.release-notes }}" \
+            $([[ "${{ needs.versie.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
       - name: clean up branch
         if: always()
         run: |
-          git push origin --delete release-${{ needs.unnamed_versioning_tool.outputs.version }}
+          git push origin --delete release-${{ needs.versie.outputs.version }}

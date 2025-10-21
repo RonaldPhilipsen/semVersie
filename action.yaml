@@ -1,11 +1,11 @@
-name: unnamed_versioning_tool
+name: Versie
 description: Semantic versioning tool
 author: Ronald Philipsen
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
   icon: git-merge
-  color: purple
+  color: gray-dark
 
 inputs:
   build-metadata:

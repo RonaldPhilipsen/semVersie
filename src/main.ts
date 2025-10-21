@@ -48,10 +48,14 @@ export async function getImpactFromGithub(
     );
     final_impact = pr_impact;
   } else if (pr_impact !== undefined) {
-    core.info(`Using PR title impact (${Impact[pr_impact.impact]}) for version bump.`);
+    core.info(
+      `Using PR title impact (${Impact[pr_impact.impact]}) for version bump.`,
+    );
     final_impact = pr_impact;
   } else if (max_commit_impact !== undefined) {
-    core.info(`Using maximum commit impact (${Impact[max_commit_impact]}) for version bump.`);
+    core.info(
+      `Using maximum commit impact (${Impact[max_commit_impact]}) for version bump.`,
+    );
     final_impact = commit_impacts.find((c) => c.impact === max_commit_impact);
   } else {
     core.error(
@@ -216,7 +220,7 @@ export async function write_job_summary(
         : 'none';
     const finalImpactStr = impact !== undefined ? Impact[impact] : 'none';
 
-    core.summary.addHeading('unnamed_versioning_tool summary', 2).addTable([
+    core.summary.addHeading('Versie summary', 2).addTable([
       ['Item', 'Value'],
       ['Previous', last_release_version.toString()],
       ['New', `${new_version.toString()}`],

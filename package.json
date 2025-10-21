@@ -1,5 +1,5 @@
 {
-  "name": "unnamed_versioning_tool",
+  "name": "versie",
   "version": "0.0.1",
   "description": "Simple semantic versioning",
   "type": "module",

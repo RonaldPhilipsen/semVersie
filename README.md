@@ -1,19 +1,14 @@
-# unnamed_versioning_tool
+<img src="docs/resources/logo/versie-final.svg" alt="Versie banner" width="100%" />
 
-Simple semantic versioning for GitHub Actions and repositories that use
-conventional commits.
+# Versie
 
-What it does
+`[ˈvɛrzi]` Is the dutch word for version,
 
 This project calculates semantic-version bumps (major/minor/patch) from
 conventional-commit style pull requests and can be used in a GitHub Actions
 workflow to automatically determine the next release version.
 
-Key features
-
-- Infers semver bump from conventional commits
-- Optional build metadata via workflow inputs
-- Simple to integrate into CI workflows
+We explicitly try to keep things simple by having the user deal with the intricacies of the actual release process, this keeps the action relatively lean and understandable without limiting the useability to a few languages.
 
 ## Usage (GitHub Actions)
 
@@ -23,6 +18,7 @@ as a job output:
 ```yaml
 jobs:
   version:
+    name: Versie
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -30,8 +26,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Calculate version
-        id: version
-        uses: RonaldPhilipsen/unnamed_versioning_tool@vX.Y.Z
+        id: versie
+        uses: RonaldPhilipsen/Versie@vX.Y.Z
         with:
           # Optional: pass build metadata (e.g. commit SHA)
           build-metadata: ${{ github.sha }}
@@ -48,15 +44,15 @@ Please note that running this action from a non-fixed version is _not_ supported
 
 ### outputs
 
-| Output               | Description                                                                                   | Example                                                                                       |
-| -------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `release`            | Boolean indicating whether a new release should be created                                    | `true`                                                                                        |
-| `release-notes`      | Generated release notes in markdown                                                           | See [example](https://github.com/RonaldPhilipsen/unnamed_versioning_tool/releases/tag/v1.0.3) |
-| `release-notes-file` | Generated release notes in markdown, dumped to a file on disk, useful for large release notes |                                                                                               |
-| `prerelease`         | Boolean indicating whether the created release is a prerelease                                | `false`                                                                                       |
-| `tag`                | The semantic version in `tag` format,                                                         | `v1.2.3-rc0`                                                                                  |
-| `version`            | The semantic version in `semver` format,                                                      | `1.2.3-rc.0`                                                                                  |
-| `version-pep-440`    | The semantic version in `pep-440` format,                                                     | `1.2.3rc0`                                                                                    |
+| Output               | Description                                                                                   | Example                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `release`            | Boolean indicating whether a new release should be created                                    | `true`                                                                       |
+| `release-notes`      | Generated release notes in markdown                                                           | See [example](https://github.com/RonaldPhilipsen/Versie/releases/tag/v1.0.3) |
+| `release-notes-file` | Generated release notes in markdown, dumped to a file on disk, useful for large release notes |                                                                              |
+| `prerelease`         | Boolean indicating whether the created release is a prerelease                                | `false`                                                                      |
+| `tag`                | The semantic version in `tag` format,                                                         | `v1.2.3-rc0`                                                                 |
+| `version`            | The semantic version in `semver` format,                                                      | `1.2.3-rc.0`                                                                 |
+| `version-pep-440`    | The semantic version in `pep-440` format,                                                     | `1.2.3rc0`                                                                   |
 
 ## Development
 
