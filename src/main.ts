@@ -253,6 +253,35 @@ export async function run() {
       core.setFailed('No GITHUB_TOKEN available — cannot fetch releases');
       return;
     }
+    const release_notes_format_input = core.getInput('release-notes-format', {
+      required: false,
+      trimWhitespace: true,
+    });
+
+    let release_notes_format = '%S'; // Default format
+
+    if (
+      release_notes_format_input &&
+      release_notes_format_input.trim() !== ''
+    ) {
+      core.info(
+        `Attempting to load release notes format from: ${release_notes_format_input}`,
+      );
+      const formatContent = await gh.getFileContent(
+        token,
+        release_notes_format_input,
+      );
+      if (formatContent !== undefined) {
+        release_notes_format = formatContent;
+        core.info(
+          `Successfully loaded release notes format from ${release_notes_format_input}`,
+        );
+      } else {
+        core.warning(
+          `Could not load release notes format from ${release_notes_format_input}, using default format`,
+        );
+      }
+    }
 
     const release = await gh.getLatestRelease(token);
 
@@ -314,7 +343,11 @@ export async function run() {
     );
 
     core.info(`Final determined impact: ${String(impact)}`);
-    const release_notes = generateReleaseNotes(commits);
+    const generated_release_notes = generateReleaseNotes(commits);
+    const release_notes = release_notes_format.replace(
+      '<INSERT_RELEASE_NOTES_HERE>',
+      generated_release_notes,
+    );
     const filePath = './release-notes.md';
     await writeFile(filePath, release_notes, 'utf8');
     core.info(`Wrote release notes to ${filePath}`);

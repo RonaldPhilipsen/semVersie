@@ -54,6 +54,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         uses: ./
+        with:
+          release-notes-format: 'docs/resources/release-format.md'
 
   release:
     name: Create Release
