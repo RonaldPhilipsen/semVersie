@@ -17,18 +17,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  versie:
-    name: Versie
+  semVersie:
+    name: semVersie
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      release: ${{ steps.versie.outputs.release }}
-      release-notes: ${{ steps.versie.outputs.release-notes }}
-      prerelease: ${{ steps.versie.outputs.prerelease }}
-      tag: ${{ steps.versie.outputs.tag }}
-      version: ${{ steps.versie.outputs.version }}
-      version-pep-440: ${{ steps.versie.outputs['version-pep-440'] }}
+      release: ${{ steps.semVersie.outputs.release }}
+      release-notes: ${{ steps.semVersie.outputs.release-notes }}
+      prerelease: ${{ steps.semVersie.outputs.prerelease }}
+      tag: ${{ steps.semVersie.outputs.tag }}
+      version: ${{ steps.semVersie.outputs.version }}
+      version-pep-440: ${{ steps.semVersie.outputs['version-pep-440'] }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Node.js
@@ -49,19 +49,19 @@ jobs:
         run: npm install
       - name: build distribution
         run: npm run build
-      - id: versie
-        name: versie
+      - id: semVersie
+        name: semVersie
         env:
           GITHUB_TOKEN: ${{ github.token }}
         uses: ./
 
   release:
     name: Create Release
-    needs: versie
+    needs: semVersie
     runs-on: ubuntu-latest
     permissions:
       contents: write # to be able to push commits and create releases
-    if: needs.versie.outputs.release == 'true'
+    if: needs.semVersie.outputs.release == 'true'
     steps:
       - uses: actions/checkout@v4
       - name: Install Node.js
@@ -79,29 +79,29 @@ jobs:
             ${{ runner.os }}-node-modules-
       - name: update version in package.json
         run: |
-          npm version ${{ needs.versie.outputs.version }} --no-git-tag-version
+          npm version ${{ needs.semVersie.outputs.version }} --no-git-tag-version
       - name: build distribution
         run: npm run build
       - name: Commit version bump
-        if: needs.versie.outputs.release == 'true'
+        if: needs.semVersie.outputs.release == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git switch -c release-${{ needs.versie.outputs.version }}
+          git switch -c release-${{ needs.semVersie.outputs.version }}
           # temporarily unignore dist/ to commit built files
           git add --force dist/ dist/index.js dist/package.json package.json package-lock.json
           git status
-          git commit -m "chore: bump version to ${{ needs.versie.outputs.version }}"
-          git push --set-upstream origin release-${{ needs.versie.outputs.version }}
+          git commit -m "chore: bump version to ${{ needs.semVersie.outputs.version }}"
+          git push --set-upstream origin release-${{ needs.semVersie.outputs.version }}
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ needs.versie.outputs.tag }} \
-            --title "${{ needs.versie.outputs.tag }}" \
-            --notes "${{ needs.versie.outputs.release-notes }}" \
-            $([[ "${{ needs.versie.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
+          gh release create ${{ needs.semVersie.outputs.tag }} \
+            --title "${{ needs.semVersie.outputs.tag }}" \
+            --notes "${{ needs.semVersie.outputs.release-notes }}" \
+            $([[ "${{ needs.semVersie.outputs.prerelease }}" == "true" ]] && echo "--prerelease" || echo "")
       - name: clean up branch
         if: always()
         run: |
-          git push origin --delete release-${{ needs.versie.outputs.version }}
+          git push origin --delete release-${{ needs.semVersie.outputs.version }}

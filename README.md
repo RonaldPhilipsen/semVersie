@@ -1,8 +1,8 @@
-<img src="docs/resources/logo/versie-final.svg" alt="Versie banner" width="100%" />
+<img src="docs/resources/logo/semVersie-final.svg" alt="Versie banner" width="100%" />
 
 # Versie
 
-`[ˈvɛrzi]` Is the dutch word for version,
+`[semˈvɛrzi]` Is the dutch word for version,
 
 This project calculates semantic-version bumps (major/minor/patch) from
 conventional-commit style pull requests and can be used in a GitHub Actions
@@ -18,7 +18,7 @@ as a job output:
 ```yaml
 jobs:
   version:
-    name: Versie
+    name: semVersie
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Calculate version
         id: versie
-        uses: RonaldPhilipsen/Versie@vX.Y.Z
+        uses: RonaldPhilipsen/semVersie@vX.Y.Z
         with:
           # Optional: pass build metadata (e.g. commit SHA)
           build-metadata: ${{ github.sha }}
@@ -47,7 +47,7 @@ Please note that running this action from a non-fixed version is _not_ supported
 | Output               | Description                                                                                   | Example                                                                      |
 | -------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `release`            | Boolean indicating whether a new release should be created                                    | `true`                                                                       |
-| `release-notes`      | Generated release notes in markdown                                                           | See [example](https://github.com/RonaldPhilipsen/Versie/releases/tag/v1.0.3) |
+| `release-notes`      | Generated release notes in markdown                                                           | See [example](https://github.com/RonaldPhilipsen/semVersie/releases/tag/v1.0.3) |
 | `release-notes-file` | Generated release notes in markdown, dumped to a file on disk, useful for large release notes |                                                                              |
 | `prerelease`         | Boolean indicating whether the created release is a prerelease                                | `false`                                                                      |
 | `tag`                | The semantic version in `tag` format,                                                         | `v1.2.3-rc0`                                                                 |
