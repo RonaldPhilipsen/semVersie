@@ -5,7 +5,7 @@
   
   <!-- Title moved down -->
   <g id="title">
-    <text x="100" y="55" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#333">Versie</text>
+    <text x="100" y="55" text-anchor="middle" font-family="Arial, sans-serif" font-siz="42" font-weight="bold" fill="#333">semVersie</text>
     <text x="100" y="73" text-anchor="middle" font-family="monospace" font-size="11" fill="#666">feat: fix: docs: chore:</text>
   </g>
   
