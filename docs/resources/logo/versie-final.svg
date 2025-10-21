@@ -6,7 +6,7 @@
   <!-- App name on the LEFT -->
   <g id="app-name">
     <text x="20" y="45" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#333">Versie</text>
-    <text x="20" y="65" font-family="Arial, sans-serif" font-size="12" fill="#666">Semantic Versioning Tool</text>
+    <text x="20" y="65" font-family="Arial, sans-serif" font-size="12" fill="#666">Semantic versioning made easy</text>
     <text x="20" y="80" font-family="monospace" font-size="10" fill="#888">feat: fix: docs: chore:</text>
   </g>
   

@@ -1,21 +1,14 @@
-# versie
+<img src="docs/resources/logo/versie-final.svg" alt="Versie banner" width="100%" />
 
-![Versie Logo](docs/resources/logo/versie-final.svg)
+# Versie
 
-Simple semantic versioning for GitHub Actions and repositories that use
-conventional commits.
-
-What it does
+`[ˈvɛrzi]` Is the dutch word for version,
 
 This project calculates semantic-version bumps (major/minor/patch) from
 conventional-commit style pull requests and can be used in a GitHub Actions
 workflow to automatically determine the next release version.
 
-Key features
-
-- Infers semver bump from conventional commits
-- Optional build metadata via workflow inputs
-- Simple to integrate into CI workflows
+We explicitly try to keep things simple by having the user deal with the intricacies of the actual release process, this keeps the action relatively lean and understandable without limiting the useability to a few languages.
 
 ## Usage (GitHub Actions)
 
