@@ -2,7 +2,7 @@
 
 # Versie
 
-`[semˈvɛrzi]` Is the dutch word for version,
+`[vɛrzi]` Is the dutch word for version,
 
 This project calculates semantic-version bumps (major/minor/patch) from
 conventional-commit style pull requests and can be used in a GitHub Actions
