@@ -4,6 +4,7 @@ import {
   ParseConventionalBody,
   getConventionalImpact,
 } from '../src/conventional_commits';
+import { PullRequest } from '../src/github.js';
 import { Impact } from '../src/types.js';
 
 describe('ParseSemanticTitle', () => {
@@ -64,10 +65,20 @@ describe('conventional_commits.ts (parser) - concise coverage', () => {
   });
 
   test('getConventionalImpact prefers body over title', () => {
-    const gi1 = getConventionalImpact('feat: x', 'BREAKING CHANGE: y');
+    const pr = {
+      title: 'feat: add new feature',
+      body: 'This is the body.\n\nBREAKING CHANGE: incompatible API change.',
+    } as PullRequest
+    const gi1 = getConventionalImpact(pr);
     expect(gi1).toBeDefined();
     expect(gi1!.impact).toBe(Impact.MAJOR);
-    const gi2 = getConventionalImpact('fix: x', undefined);
+
+    const pr2 = {
+      title: 'fix: bugfix',
+      body: '',
+    } as PullRequest
+
+    const gi2 = getConventionalImpact(pr2);
     expect(gi2).toBeDefined();
     expect(gi2!.impact).toBe(Impact.PATCH);
   });
