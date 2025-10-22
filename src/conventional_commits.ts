@@ -5,7 +5,7 @@ import {
   ParsedCommitInfo,
   TypeToImpactMapping,
 } from './types.js';
-
+import type { Commit, PullRequest } from './github.js';
 /**
  * Maps conventional commit types to the corresponding BumpType used by the versioning logic.
  *
@@ -28,18 +28,17 @@ import {
  */
 
 export function getConventionalImpact(
-  title: string,
-  body: string | undefined,
+  object: PullRequest | Commit,
 ): ParsedCommitInfo | undefined {
-  const impact = ParseConventionalTitle(title);
+  const impact = ParseConventionalTitle(object.title);
   if (!impact) {
     core.info(
       'Title did not conform to Conventional Commits, no impact determined',
     );
     return undefined;
   }
-  if (body) {
-    const body_impact = ParseConventionalBody(body);
+  if (object.body) {
+    const body_impact = ParseConventionalBody(object.body);
     if (body_impact && body_impact > impact.impact) {
       core.info(
         `Body indicates higher impact (${Impact[body_impact]}) than title (${Impact[impact.impact]}), using body impact`,
@@ -75,22 +74,20 @@ export function ParseConventionalTitle(
     /^(?<type>\w+)(?:\((?<scope>[^)]+)\))?(?<breaking>!)?:\s*(?<description>.*)$/;
   const match = title.match(re);
   if (!match) {
-    core.setFailed(
-      `PR title does not conform to Conventional Commits format: ${title}`,
-    );
+    core.warning(`Title does not match Conventional Commits format: ${title}`);
     return undefined;
   }
   const commit_type = match.groups?.['type'];
 
   if (!commit_type) {
-    core.setFailed(`Could not extract commit type from PR title: ${title}`);
+    core.warning(`Could not extract commit type from title: ${title}`);
     return undefined;
   }
   const breaking = match.groups?.['breaking'];
   core.debug(`Extracted commit type: ${commit_type}`);
   const type = commit_type as ConventionalCommitType;
   if (!(type in TypeToImpactMapping)) {
-    core.error(
+    core.warning(
       `Commit type '${type}' not recognized in Conventional Commits mapping`,
     );
     return undefined;
