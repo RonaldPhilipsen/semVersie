@@ -68,7 +68,7 @@ describe('conventional_commits.ts (parser) - concise coverage', () => {
     const pr = {
       title: 'feat: add new feature',
       body: 'This is the body.\n\nBREAKING CHANGE: incompatible API change.',
-    } as PullRequest
+    } as PullRequest;
     const gi1 = getConventionalImpact(pr);
     expect(gi1).toBeDefined();
     expect(gi1!.impact).toBe(Impact.MAJOR);
@@ -76,7 +76,7 @@ describe('conventional_commits.ts (parser) - concise coverage', () => {
     const pr2 = {
       title: 'fix: bugfix',
       body: '',
-    } as PullRequest
+    } as PullRequest;
 
     const gi2 = getConventionalImpact(pr2);
     expect(gi2).toBeDefined();
