@@ -1,0 +1,72 @@
+name: 'Qualify'
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    branches:
+      - main
+
+concurrency:
+  group: 'qualify-${{ github.event.pull_request.head.sha }}'
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: qualify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '24'
+      - name: Cache node modules
+        timeout-minutes: 5
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: |
+            ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+      - name: setup dependencies
+        timeout-minutes: 5
+        run: npm install
+      - name: run tests
+        run: npm test
+
+  formatting:
+    name: Check code formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '24'
+      - name: Cache node modules
+        timeout-minutes: 5
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: |
+            ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+      - name: setup dependencies
+        timeout-minutes: 5
+        run: npm install
+      - name: check formatting
+        run: npm run format
+      - name: verify no formatting changes
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "Code is not properly formatted. Please run 'npm run format' and commit the changes.";
+            exit 1;
+          else
+            echo "Code is properly formatted.";
+          fi
