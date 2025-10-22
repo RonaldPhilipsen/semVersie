@@ -1,6 +1,6 @@
 <img src="docs/resources/logo/semversie-final.svg" alt="Versie banner" width="100%" />
 
-# Versie
+# semVersie
 
 `[vɛrzi]` Is the dutch word for version,
 
