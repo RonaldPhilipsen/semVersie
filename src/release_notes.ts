@@ -21,7 +21,7 @@ export function generateReleaseNotes(commits: Commit[]): string {
   const others: Commit[] = [];
 
   for (const commit of commits) {
-    const commit_impact = getConventionalImpact(commit.title, commit.body);
+    const commit_impact = getConventionalImpact(commit);
     switch (commit_impact?.impact) {
       case Impact.MAJOR:
         breaking.push(commit);

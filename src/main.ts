@@ -12,13 +12,13 @@ export async function getImpactFromGithub(
   pr: PullRequest,
   commits: Commit[],
 ): Promise<ImpactResult> {
-  const pr_impact = getConventionalImpact(pr.title, pr.body);
+  const pr_impact = getConventionalImpact(pr);
   core.info(`Determined impact from Pull request: ${String(pr_impact)}`);
 
   const commit_impacts: ParsedCommitInfo[] = [];
   // Parse each commit title
   for (const commit of commits) {
-    const commit_impact = getConventionalImpact(commit.title, commit.body);
+    const commit_impact = getConventionalImpact(commit);
     core.debug(`Commit ${commit.sha} title: ${commit.title}`);
     core.debug(`Determined impact from commit: ${String(commit_impact)}`);
     if (commit_impact !== undefined) {
