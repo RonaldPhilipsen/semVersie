@@ -30,7 +30,7 @@ jobs:
       version: ${{ steps.semVersie.outputs.version }}
       version-pep-440: ${{ steps.semVersie.outputs['version-pep-440'] }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
@@ -65,7 +65,7 @@ jobs:
       contents: write # to be able to push commits and create releases
     if: needs.semVersie.outputs.release == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
