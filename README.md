@@ -39,10 +39,10 @@ Please note that running this action from a non-fixed version is _not_ supported
 
 ### Inputs
 
-| Input                  | Description                                        | Required | Default                                                               |
-| ---------------------- | -------------------------------------------------- | -------- | --------------------------------------------------------------------- |
-| `github-token`         | GitHub token for API access                        | Yes      | `${{ github.token }}`                                                 |
-| `build-metadata`       | Build metadata to include in the semver            | No       | ``                                                                    |
+| Input                  | Description                                        | Required | Default                                                                                                            |
+| ---------------------- | -------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `github-token`         | GitHub token for API access                        | Yes      | `${{ github.token }}`                                                                                              |
+| `build-metadata`       | Build metadata to include in the semver            | No       | ``                                                                                                                 |
 | `release-notes-format` | Format to fill in for the release notes generation | No       | `<INSERT_RELEASE_NOTES_HERE>` key will be replaced with release notes, [example](docs/resources/release-format.md) |
 
 ### outputs
