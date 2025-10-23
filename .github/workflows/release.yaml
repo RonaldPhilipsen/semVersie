@@ -35,15 +35,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - name: Cache node modules
-        timeout-minutes: 5
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: |
-            ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
       - name: setup dependencies
         timeout-minutes: 5
         run: npm install
@@ -70,15 +61,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - name: Cache node modules
-        timeout-minutes: 5
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: |
-            ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
       - name: update version in package.json
         run: |
           npm version ${{ needs.semVersie.outputs.version }} --no-git-tag-version
