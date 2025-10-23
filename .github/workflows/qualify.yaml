@@ -15,7 +15,7 @@ concurrency:
 jobs:
   qualify:
     name: qualify
-    runs-on: ubuntu-latest
+    runs-on: semversie-runner
     permissions:
       contents: read
     steps:
@@ -41,7 +41,7 @@ jobs:
 
   formatting:
     name: Check code formatting
-    runs-on: ubuntu-latest
+    runs-on: semversie-runner
     steps:
       - uses: actions/checkout@v5
       - name: Install Node.js
