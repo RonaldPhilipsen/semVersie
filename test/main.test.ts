@@ -41,7 +41,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
     // mock github/conventional_commits
     // @ts-ignore
     await (jest as any).unstable_mockModule('../src/github.js', () => ({
-      getLatestRelease: async () => undefined,
+      getLatestTag: async () => undefined,
       getPrCommits: mockedGetPrCommits,
       getPrFromContext: () => undefined,
       getReleaseCandidatesSinceLatestRelease: async () => [],
@@ -88,7 +88,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
     );
     // @ts-ignore
     await (jest as any).unstable_mockModule('../src/github.js', () => ({
-      getLatestRelease: async () => undefined,
+      getLatestTag: async () => undefined,
       getPrCommits: mockedGetPrCommits,
       getPrFromContext: () => undefined,
       getReleaseCandidatesSinceLatestRelease: async () => [],
@@ -203,7 +203,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
       // mock github behavior via unstable_mockModule (module will be imported by main)
       // @ts-ignore
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
-        getLatestRelease: async () => ({ name: 'not-a-version' }),
+        getLatestTag: async () => ({ name: 'not-a-version' }),
         getPrFromContext: () => undefined,
         getPrCommits: async () => [],
         getReleaseCandidatesSinceLatestRelease: async () => [],
@@ -241,7 +241,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
       // mock github and patch core
       // @ts-ignore
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
-        getLatestRelease: async () => ({ name: 'v1.2.3' }),
+        getLatestTag: async () => ({ name: 'v1.2.3' }),
         getPrFromContext: () => undefined,
         getPrCommits: async () => [],
         getReleaseCandidatesSinceLatestRelease: async () => [],
@@ -287,7 +287,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
       // mock github and conventional_commits and patch core
       // @ts-ignore
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
-        getLatestRelease: async () => ({ name: 'v1.2.3' }),
+        getLatestTag: async () => ({ name: 'v1.2.3' }),
         getPrFromContext: () => pr,
         getPrCommits: async () => [],
         getReleaseCandidatesSinceLatestRelease: async () => [],
@@ -344,7 +344,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
       // mock github to provide baseline v1.0.0 and existing rc tags for 1.0.1
       // @ts-ignore
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
-        getLatestRelease: async () => ({ name: 'v1.0.0' }),
+        getLatestTag: async () => ({ name: 'v1.0.0' }),
         getPrFromContext: () => pr,
         getPrCommits: async () => [],
         getReleaseCandidatesSinceLatestRelease: async () => [

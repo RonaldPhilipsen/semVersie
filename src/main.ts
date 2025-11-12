@@ -241,12 +241,12 @@ export async function run() {
       }
     }
 
-    const release = await gh.getLatestRelease(token);
+    const tag = await gh.getLatestTag(token);
 
     let last_release_version: SemanticVersion | undefined;
-    if (release != undefined) {
+    if (tag != undefined) {
       core.info('Previous release found.');
-      const releaseName = release.name ?? release.tag_name ?? '';
+      const releaseName = tag.name ?? '';
       last_release_version = SemanticVersion.parse(releaseName);
     } else {
       core.info('No Previous release found, assuming this is v0.0.0.');
