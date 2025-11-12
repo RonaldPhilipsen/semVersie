@@ -13,7 +13,8 @@ on:
       - main
 
 concurrency:
-  group: 'release-${{ github.event.pull_request.merge_commit_sha || github.sha }}'
+  group:
+    'release-${{ github.event.pull_request.merge_commit_sha || github.sha }}'
   cancel-in-progress: true
 
 jobs:
