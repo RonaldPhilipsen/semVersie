@@ -55,7 +55,11 @@ export function getConventionalImpact(
  * @returns BumpType.MAJOR if "BREAKING CHANGE" is found, otherwise undefined
  */
 export function ParseConventionalBody(body: string) {
-  if (body.includes('BREAKING CHANGE')) {
+  // strip renovatebot release notes
+  const re = /---\n\n### Release Notes\n\n<details>(?:.|\n)*<\/details>\n\n---/;
+  const clean_body = body.replace(re, '');
+
+  if (clean_body.includes('BREAKING CHANGE')) {
     return Impact.MAJOR;
   }
   return undefined;

@@ -52,6 +52,7 @@ describe('conventional_commits.ts (parser) - concise coverage', () => {
     ['chore!: drop support', Impact.MAJOR],
     ['docs: update readme', Impact.NOIMPACT],
     ['fix: bugfix', Impact.PATCH],
+    ['chore(deps): update dependency @eslint/compat to v2 ', Impact.NOIMPACT],
   ])("ParseConventionalTitle('%s') => %p", (title, expected) => {
     const res = ParseConventionalTitle(title);
     expect(res).toBeDefined();
@@ -94,5 +95,58 @@ describe('conventional_commits.ts (parser) - concise coverage', () => {
 
   test('ParseConventionalBody returns undefined when no BREAKING CHANGE', () => {
     expect(ParseConventionalBody('normal body')).toBeUndefined();
+  });
+});
+
+describe('bugs found', () => {
+  test('Renovate release notes are stripped', () => {
+    const body_with_release_notes = `This PR updates a dependency.
+
+---
+
+### Release Notes
+
+<details>
+<summary>eslint/rewrite (@&#8203;eslint/compat)</summary>
+
+### [\`v2.0.0\`](https://redirect.github.com/eslint/rewrite/blob/HEAD/packages/compat/CHANGELOG.md#200-2025-11-14)
+
+[Compare Source](https://redirect.github.com/eslint/rewrite/compare/f5ecc7e945634a173af677d2d597d583bd2704e6...c368656dbba4d927344905f24b3993a378a59a88)
+
+##### ⚠ BREAKING CHANGES
+
+- Require Node.js ^20.19.0 || ^22.13.0 || >=24 ([#&#8203;297](https://redirect.github.com/eslint/rewrite/issues/297))
+
+
+</details>
+
+---`;
+
+    expect(ParseConventionalBody(body_with_release_notes)).toBeUndefined();
+  });
+  test('Renovate release notes are stripped, but real majors are kept', () => {
+    const body_with_release_notes = `This PR updates a dependency.
+BREAKING CHANGE: changed API behavior.
+---
+
+### Release Notes
+
+<details>
+<summary>eslint/rewrite (@&#8203;eslint/compat)</summary>
+
+### [\`v2.0.0\`](https://redirect.github.com/eslint/rewrite/blob/HEAD/packages/compat/CHANGELOG.md#200-2025-11-14)
+
+[Compare Source](https://redirect.github.com/eslint/rewrite/compare/f5ecc7e945634a173af677d2d597d583bd2704e6...c368656dbba4d927344905f24b3993a378a59a88)
+
+##### ⚠ BREAKING CHANGES
+
+- Require Node.js ^20.19.0 || ^22.13.0 || >=24 ([#&#8203;297](https://redirect.github.com/eslint/rewrite/issues/297))
+
+
+</details>
+
+---`;
+
+    expect(ParseConventionalBody(body_with_release_notes)).toBe(Impact.MAJOR);
   });
 });
