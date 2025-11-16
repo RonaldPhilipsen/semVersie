@@ -27,12 +27,14 @@ function isTestEnvironment(): boolean {
 /**
  * Execute a git command and return the output
  */
-async function execGitCommand(args: string[]): Promise<string | null> {
+export async function execGitCommand(
+  args: string[],
+): Promise<string | undefined> {
   try {
     // Skip git commands in test environment to avoid interfering with mocks
     if (isTestEnvironment()) {
       core.debug('Skipping git command in test environment');
-      return null;
+      return undefined;
     }
 
     return new Promise((resolve, reject) => {
@@ -53,7 +55,7 @@ async function execGitCommand(args: string[]): Promise<string | null> {
           resolve(stdout.trim());
         } else {
           core.debug(`Git command failed with code ${code}: ${stderr}`);
-          resolve(null);
+          resolve(undefined);
         }
       });
 
@@ -64,14 +66,14 @@ async function execGitCommand(args: string[]): Promise<string | null> {
     });
   } catch (error) {
     core.debug(`execGitCommand failed: ${String(error)}`);
-    return null;
+    return undefined;
   }
 }
 
 /**
  * Get the latest tag from local git repository
  */
-export async function getLatestTag(): Promise<Tag | null> {
+export async function getLatestTag(): Promise<Tag | undefined> {
   try {
     // Get all tags and return the first one (most recent due to sorting)
     const allTags = await getTags();
@@ -82,10 +84,10 @@ export async function getLatestTag(): Promise<Tag | null> {
     }
 
     core.debug('No tags found in local git repository');
-    return null;
+    return undefined;
   } catch (error) {
     core.debug(`getLatestTag failed: ${String(error)}`);
-    return null;
+    return undefined;
   }
 }
 
@@ -108,26 +110,7 @@ export async function getCommits(
     if (!result) {
       return [];
     }
-
-    const commits: Commit[] = [];
-    const commitLines = result
-      .split('\n')
-      .filter((line) => line.trim().length > 0);
-
-    for (const line of commitLines) {
-      const parts = line.split('|||');
-      if (parts.length >= 2) {
-        const sha = parts[0].trim();
-        const title = parts[1].trim();
-        const body = parts.length > 2 ? parts[2].trim() : undefined;
-
-        commits.push({
-          sha,
-          title,
-          body: body && body.length > 0 ? body : undefined,
-        });
-      }
-    }
+    const commits = parseCommitsOutput(result);
 
     core.info(
       `Found ${commits.length} commits from local git between ${baseRef} and ${headRef}`,
@@ -137,6 +120,33 @@ export async function getCommits(
     core.debug(`getCommits failed: ${String(error)}`);
     return [];
   }
+}
+
+/**
+ * Parse the output of `git log --pretty=format:%H|||%s|||%b` into Commit[]
+ */
+export function parseCommitsOutput(result: string): Commit[] {
+  const commits: Commit[] = [];
+  const commitLines = result
+    .split('\n')
+    .filter((line) => line.trim().length > 0);
+
+  for (const line of commitLines) {
+    const parts = line.split('|||');
+    if (parts.length >= 2) {
+      const sha = parts[0].trim();
+      const title = parts[1].trim();
+      const body = parts.length > 2 ? parts[2].trim() : undefined;
+
+      commits.push({
+        sha,
+        title,
+        body: body && body.length > 0 ? body : undefined,
+      });
+    }
+  }
+
+  return commits;
 }
 
 /**
@@ -156,32 +166,7 @@ async function getTags(): Promise<Tag[]> {
       return [];
     }
 
-    const tags: Tag[] = [];
-    const tagLines = result
-      .split('\n')
-      .filter((line) => line.trim().length > 0);
-
-    for (const line of tagLines) {
-      const parts = line.split('|||');
-      if (parts.length >= 5) {
-        const name = parts[0].trim();
-        const commit = parts[1].trim();
-        const author = parts[2].trim();
-        const dateStr = parts[3].trim();
-        const content = parts[4] ? parts[4].trim() : '';
-
-        // Parse the ISO date string
-        const date = new Date(dateStr);
-
-        tags.push({
-          name,
-          commit,
-          author,
-          date,
-          content,
-        });
-      }
-    }
+    const tags = parseTagsOutput(result);
 
     core.info(`Found ${tags.length} tags from local git`);
     return tags;
@@ -192,19 +177,51 @@ async function getTags(): Promise<Tag[]> {
 }
 
 /**
+ * Parse the output of `git for-each-ref --format=...` into Tag[]
+ */
+export function parseTagsOutput(result: string): Tag[] {
+  const tags: Tag[] = [];
+  const tagLines = result.split('\n').filter((line) => line.trim().length > 0);
+
+  for (const line of tagLines) {
+    const parts = line.split('|||');
+    if (parts.length >= 5) {
+      const name = parts[0].trim();
+      const commit = parts[1].trim();
+      const author = parts[2].trim();
+      const dateStr = parts[3].trim();
+      const content = parts[4] ? parts[4].trim() : '';
+
+      // Parse the ISO date string
+      const date = new Date(dateStr);
+
+      tags.push({
+        name,
+        commit,
+        author,
+        date,
+        content,
+      });
+    }
+  }
+
+  return tags;
+}
+
+/**
  * Get file content from a specific commit or branch
  */
 export async function getFileContent(
   filePath: string,
   ref?: string,
-): Promise<string | null> {
+): Promise<string | undefined> {
   try {
     const args = ref
       ? ['show', `${ref}:${filePath}`]
       : ['show', `HEAD:${filePath}`];
     const result = await execGitCommand(args);
 
-    if (result !== null) {
+    if (result !== undefined) {
       core.info(
         `Retrieved file ${filePath} from git${ref ? ` at ref ${ref}` : ''}`,
       );
@@ -214,10 +231,10 @@ export async function getFileContent(
     core.debug(
       `File ${filePath} not found in git${ref ? ` at ref ${ref}` : ''}`,
     );
-    return null;
+    return undefined;
   } catch (error) {
     core.debug(`getFileContent failed: ${String(error)}`);
-    return null;
+    return undefined;
   }
 }
 

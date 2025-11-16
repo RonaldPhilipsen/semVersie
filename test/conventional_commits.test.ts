@@ -3,7 +3,7 @@ import {
   ParseConventionalTitle,
   ParseConventionalBody,
   getConventionalImpact,
-} from '../src/conventional_commits';
+} from '../src/conventional_commits.js';
 import { PullRequest } from '../src/github.js';
 import { Impact } from '../src/semver.js';
 

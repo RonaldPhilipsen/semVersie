@@ -1,11 +1,1 @@
-{
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "outDir": "./dist"
-  },
-  "exclude": ["tst", "coverage", "dist", "node_modules"],
-  "include": ["src"]
-}
+tsconfig.eslint.json

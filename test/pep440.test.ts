@@ -1,4 +1,4 @@
-import { parse_pep440 } from '../src/pep440';
+import { parse_pep440 } from '../src/pep440.js';
 
 describe('PEP 440 parsing and normalization', () => {
   test.each([

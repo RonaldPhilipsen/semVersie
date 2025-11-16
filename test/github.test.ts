@@ -27,17 +27,17 @@ describe('github module', () => {
 
     mockContext.payload = { pull_request: { number: 5, title: 'x' } };
     jest.resetModules();
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     expect(mod.getPrFromContext()!.number).toBe(5);
 
     mockContext.payload = { event: { pull_request: { number: 7 } } };
     jest.resetModules();
-    const mod2 = await import('../src/github');
+    const mod2 = await import('../src/github.js');
     expect(mod2.getPrFromContext()!.number).toBe(7);
 
     mockContext.payload = { event: { pull_request: { title: 'T' } } };
     jest.resetModules();
-    const mod3 = await import('../src/github');
+    const mod3 = await import('../src/github.js');
     expect(mod3.getPrTitleFromContext()).toBe('T');
   });
 
@@ -62,7 +62,7 @@ describe('github module', () => {
     };
     // @ts-ignore
     await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     const p1 = mod.getLatestTag('tok');
     const p2 = mod.getLatestTag('tok');
     const [r1, r2] = await Promise.all([p1, p2]);
@@ -115,7 +115,7 @@ describe('github module', () => {
       debug: () => {},
     }));
 
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     // First concurrent calls: underlying call throws for both; wrapper should delete cache and return []
     const p1 = mod.getPrCommits('tok');
     const p2 = mod.getPrCommits('tok');
@@ -150,7 +150,7 @@ describe('github module', () => {
     await (jest as any).unstable_mockModule('@actions/core', () => ({
       debug: () => {},
     }));
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     const res = await mod.getLatestTag('tok');
     expect(res).toBeUndefined();
   });
@@ -166,7 +166,7 @@ describe('github module', () => {
     await (jest as any).unstable_mockModule('@actions/core', () => ({
       debug: () => {},
     }));
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     const res = await mod.getPrCommits('');
     expect(res).toEqual([]);
   });
@@ -198,7 +198,7 @@ describe('github module', () => {
       debug: () => {},
       info: () => {},
     }));
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     const res = await mod.getPrCommits('tok');
     expect(calls.length).toBe(1);
     expect(res).toEqual([]);
@@ -224,7 +224,7 @@ describe('github module', () => {
     await (jest as any).unstable_mockModule('@actions/core', () => ({
       debug: () => {},
     }));
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     const res = await mod.getLatestTag('tok');
     // since the call throws synchronously, wrapped promise resolves to undefined
     expect(await res).toBeUndefined();
@@ -240,7 +240,7 @@ describe('github module', () => {
     };
     // @ts-ignore
     await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     const title = mod.getPrTitleFromContext();
     expect(title).toBe('abc');
   });
@@ -269,7 +269,7 @@ describe('github module', () => {
     };
     // @ts-ignore
     await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     const t = await mod.getLatestAnnotatedTag('tok', 'v1.2.3');
     expect(t).toBeDefined();
     expect(t!.name).toBe('v1.2.3');
@@ -304,7 +304,7 @@ describe('github module', () => {
     };
     // @ts-ignore
     await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    const mod = await import('../src/github');
+    const mod = await import('../src/github.js');
     const t = await mod.getLatestLightweightTag('tok', 'v1.2.3');
     expect(t).toBeDefined();
     expect(t!.name).toBe('v1.2.3');

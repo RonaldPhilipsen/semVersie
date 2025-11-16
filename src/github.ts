@@ -297,7 +297,7 @@ export async function getLatestTag(token: string): Promise<Tag | undefined> {
       const wrapped = raw.catch((err) => {
         GH_CACHE.delete(cacheKey);
         core.debug(`getLatestTag: GitHub API listTags failed: ${String(err)}`);
-        return undefined as Tag | undefined;
+        return undefined;
       });
       p = wrapped;
       GH_CACHE.set(cacheKey, p as unknown as Promise<unknown>);
