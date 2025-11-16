@@ -2,57 +2,10 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { readFile, access } from 'fs/promises';
 import { constants } from 'fs';
-import { LRUCache } from './utils.js';
-
-export type Commit = { sha: string; title: string; body?: string };
-
-/**
- * Minimal representation of a Git tag object from the GitHub REST API.
- * Extend as needed — the tests and helpers only require `name` and the
- * optional `commit.sha` field, but other properties are included for
- * convenience and future use.
- */
-export type Tag = {
-  name: string;
-  commit?: {
-    sha?: string;
-    url?: string;
-  };
-  zipball_url?: string;
-  tarball_url?: string;
-  node_id?: string;
-  [k: string]: unknown;
-};
-
-/**
- * Minimal representation of a GitHub Release object with its associated tag.
- * This mirrors the shape returned by the REST API and is intentionally
- * permissive — add fields as needed by your code.
- */
-export type Release = {
-  id?: number;
-  tag_name: string;
-  name?: string;
-  body?: string | null;
-  draft?: boolean;
-  prerelease?: boolean;
-  created_at?: string;
-  published_at?: string | null;
-  html_url?: string;
-  url?: string;
-  author?: {
-    login?: string;
-    id?: number;
-    [k: string]: unknown;
-  };
-  assets?: Array<{
-    id?: number;
-    name?: string;
-    browser_download_url?: string;
-    [k: string]: unknown;
-  }>;
-  [k: string]: unknown;
-};
+import { LRUCache, filterRCTagsByBaseline } from './utils.js';
+import * as git from './git.js';
+import { SemanticVersion } from './semver.js';
+import type { Commit, Tag } from './git.js';
 
 /**
  * Minimal Pull Request interface capturing commonly-used fields.
@@ -119,6 +72,108 @@ function parseCommit(c: unknown): Commit {
 }
 
 /**
+ * Resolve an annotated tag (tag object) into our Tag shape.
+ * Exposed for unit testing.
+ */
+export async function getLatestAnnotatedTag(
+  token: string,
+  name: string,
+): Promise<Tag | undefined> {
+  try {
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+    const ref = await octokit.rest.git.getRef({
+      owner,
+      repo,
+      ref: `tags/${name}`,
+    });
+    const obj = ref.data.object as { sha: string; type?: string } | undefined;
+    if (!obj || obj.type !== 'tag') return undefined;
+
+    const tagObj = await octokit.rest.git.getTag({
+      owner,
+      repo,
+      tag_sha: obj.sha,
+    });
+    const tagData = tagObj.data as {
+      object?: { sha?: string };
+      tagger?: { name?: string; date?: string };
+      message?: string;
+    };
+    const commitSha = tagData.object?.sha ?? '';
+    const author = tagData.tagger?.name ?? '';
+    const date = tagData.tagger?.date
+      ? new Date(tagData.tagger.date)
+      : new Date(0);
+    const content = typeof tagData.message === 'string' ? tagData.message : '';
+    return { name, commit: commitSha, author, date, content } as Tag;
+  } catch (e) {
+    core.debug(`getLatestAnnotatedTag: failed for ${name}: ${String(e)}`);
+    return undefined;
+  }
+}
+
+/**
+ * Resolve a lightweight tag (ref -> commit) into our Tag shape.
+ * Exposed for unit testing.
+ */
+export async function getLatestLightweightTag(
+  token: string,
+  name: string,
+): Promise<Tag | undefined> {
+  try {
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+    const ref = await octokit.rest.git.getRef({
+      owner,
+      repo,
+      ref: `tags/${name}`,
+    });
+    const obj = ref.data.object as { sha: string; type?: string } | undefined;
+    const commitSha = obj?.sha ?? '';
+    try {
+      const commitRes = await octokit.rest.repos.getCommit({
+        owner,
+        repo,
+        ref: commitSha,
+      });
+      const commitData = commitRes.data as {
+        commit?: {
+          author?: { name?: string; date?: string };
+          message?: string;
+        };
+      };
+      const author = commitData.commit?.author?.name ?? '';
+      const date = commitData.commit?.author?.date
+        ? new Date(commitData.commit.author.date)
+        : new Date(0);
+      const content = commitData.commit?.message ?? '';
+      return { name, commit: commitSha, author, date, content } as Tag;
+    } catch (e) {
+      core.debug(
+        `getLatestLightweightTag: failed to fetch commit for ${commitSha}: ${String(e)}`,
+      );
+      return {
+        name,
+        commit: commitSha,
+        author: '',
+        date: new Date(0),
+        content: '',
+      } as Tag;
+    }
+  } catch (e) {
+    core.debug(
+      `getLatestLightweightTag: failed to resolve ref for ${name}: ${String(e)}`,
+    );
+    return {
+      name,
+      commit: '',
+      author: '',
+      date: new Date(0),
+      content: '',
+    } as Tag;
+  }
+}
+
+/**
  * Read a pull request title from the Actions context.
  * Checks common payload locations and returns undefined when not found.
  */
@@ -130,6 +185,7 @@ export function getPrTitleFromContext(): string | undefined {
 
 /**
  * List commits for the current pull request using the Actions context.
+ * First attempts to get commits from local git, then falls back to GitHub API.
  * If token is provided it will be used to construct an Octokit instance.
  */
 export async function getPrCommits(token: string): Promise<Commit[]> {
@@ -143,14 +199,33 @@ export async function getPrCommits(token: string): Promise<Commit[]> {
       if (m) pull_number = Number(m[1]);
     }
 
+    // Try to get commits from local git first if we have PR info
+    if (pr?.base?.sha && pr?.head?.sha) {
+      core.debug(
+        `Attempting to get PR commits from local git: ${pr.base.sha}..${pr.head.sha}`,
+      );
+      const localCommits = await git.getCommits(pr.base.sha, pr.head.sha);
+      if (localCommits.length > 0) {
+        return localCommits;
+      }
+    }
+
+    // Alternative: try using branch names if available
+    if (pr?.base?.ref && pr?.head?.ref) {
+      core.debug(
+        `Attempting to get PR commits from local git using branches: ${pr.base.ref}..${pr.head.ref}`,
+      );
+      const localCommits = await git.getCommits(pr.base.ref, pr.head.ref);
+      if (localCommits.length > 0) {
+        return localCommits;
+      }
+    }
+
+    // Fallback to GitHub API
     if (!pull_number) {
       core.debug(
         'No pull request number found in context; cannot list commits',
       );
-      return [];
-    }
-    if (!token) {
-      core.debug('No token provided; cannot list PR commits');
       return [];
     }
     const { octokit, owner, repo } = getOctokitAndRepo(token);
@@ -169,13 +244,15 @@ export async function getPrCommits(token: string): Promise<Commit[]> {
         });
       } catch (err) {
         core.debug(
-          `getPrCommits: synchronous listCommits threw: ${String(err)}`,
+          `getPrCommits: synchronous GitHub API listCommits threw: ${String(err)}`,
         );
         return [];
       }
       const wrapped = raw.catch((err) => {
         GH_CACHE.delete(cacheKey);
-        core.debug(`getPrCommits: listCommits failed: ${String(err)}`);
+        core.debug(
+          `getPrCommits: GitHub API listCommits failed: ${String(err)}`,
+        );
         return [] as Commit[];
       });
       p = wrapped;
@@ -192,24 +269,35 @@ export async function getPrCommits(token: string): Promise<Commit[]> {
 }
 
 /**
- * Return the most recent tag name for the repository in the Actions context.
- * If no token is provided or the call fails, returns undefined.
+ * Return the most recent tag name for the repository in the Actions context using GitHub API.
+ * Returns undefined if the API call fails.
  */
-export async function getLatestTag(token: string): Promise<string | undefined> {
+export async function getLatestTag(token: string): Promise<Tag | undefined> {
   try {
     const { octokit, owner, repo } = getOctokitAndRepo(token);
     const cacheKey = `latestTag:${owner}/${repo}`;
-    let p = GH_CACHE.get(cacheKey) as Promise<string | undefined> | undefined;
+    let p = GH_CACHE.get(cacheKey) as Promise<Tag | undefined> | undefined;
     if (!p) {
-      const raw = Promise.resolve()
-        .then(() => octokit.rest.repos.listTags({ owner, repo, per_page: 1 }))
-        .then((res) => {
-          return (res.data && res.data[0] && res.data[0].name) || undefined;
+      const raw = (async (): Promise<Tag | undefined> => {
+        const res = await octokit.rest.repos.listTags({
+          owner,
+          repo,
+          per_page: 1,
         });
+        const t = res.data && res.data[0] ? res.data[0] : undefined;
+        if (!t || !t.name) return undefined;
+        const name = t.name;
+
+        // First try annotated tag resolution, then fallback to lightweight commit-based tag
+        const annotated = await getLatestAnnotatedTag(token, name);
+        if (annotated) return annotated;
+        return await getLatestLightweightTag(token, name);
+      })();
+
       const wrapped = raw.catch((err) => {
         GH_CACHE.delete(cacheKey);
-        core.debug(`getLatestTag: listTags failed: ${String(err)}`);
-        return undefined as string | undefined;
+        core.debug(`getLatestTag: GitHub API listTags failed: ${String(err)}`);
+        return undefined;
       });
       p = wrapped;
       GH_CACHE.set(cacheKey, p as unknown as Promise<unknown>);
@@ -222,106 +310,66 @@ export async function getLatestTag(token: string): Promise<string | undefined> {
   }
 }
 
-/**
- * Return the latest release object for the repository in the Actions context.
- * If no token is provided or the call fails, returns undefined.
- */
-export async function getLatestRelease(
-  token: string,
-): Promise<Release | undefined> {
-  try {
-    const { octokit, owner, repo } = getOctokitAndRepo(token);
-    const cacheKey = `latestRelease:${owner}/${repo}`;
-    let p = GH_CACHE.get(cacheKey) as Promise<Release | undefined> | undefined;
-    if (!p) {
-      const raw = Promise.resolve()
-        .then(() => octokit.rest.repos.getLatestRelease({ owner, repo }))
-        .then((res) => {
-          return res && res.data ? (res.data as Release) : undefined;
-        });
-      const wrapped = raw.catch((err) => {
-        GH_CACHE.delete(cacheKey);
-        core.debug(`getLatestRelease: getLatestRelease failed: ${String(err)}`);
-        return undefined as Release | undefined;
-      });
-      p = wrapped;
-      GH_CACHE.set(cacheKey, p as unknown as Promise<unknown>);
-      p.finally(() => GH_CACHE.delete(cacheKey));
-    }
-    return p;
-  } catch (err) {
-    core.debug(`getLatestRelease failed: ${String(err)}`);
-    return undefined;
-  }
-}
-
-export async function createRelease(
-  token: string,
-  tag_name: string,
-  target_commitish: string,
-  name: string,
-  body: string,
-  draft: boolean,
-  prerelease: boolean,
-  make_latest: boolean,
-): Promise<Release | undefined> {
-  try {
-    const { octokit, owner, repo } = getOctokitAndRepo(token);
-    const res = await octokit.rest.repos.createRelease({
-      owner: owner,
-      repo: repo,
-      tag_name: tag_name,
-      target_commitish: target_commitish,
-      name: name,
-      body: body,
-      draft: draft,
-      prerelease: prerelease,
-      make_latest: make_latest ? 'true' : 'false',
-    });
-    if (res && res.data) {
-      core.info(`Created release for tag ${tag_name}`);
-      return res.data as Release;
-    }
-    throw Error('Failed to create release');
-  } catch (err) {
-    core.debug(`createRelease failed: ${String(err)}`);
-    throw Error('Failed to create release');
-  }
-}
+// Compatibility wrapper: previously consumers used getLatestRelease which returned
+// a GitHub Release-shaped object. Keep a thin shim that maps the latest tag
+// into a minimal release-like shape. This can be removed after callers/tests
+// are updated to use getLatestTag directly.
+// getLatestRelease shim removed; callers should use getLatestTag directly.
 
 /**
  * Downloads a file from the GitHub repository.
- * First checks if the file exists locally, if not attempts to download from GitHub.
+ * First checks if the file exists locally, then tries git, finally falls back to GitHub API.
  *
  * @param token GitHub token for API access
  * @param filePath Path to the file in the repository (e.g., 'path/to/file.md')
+ * @param ref Optional git reference (commit, branch, tag) to fetch file from
  * @returns The file contents as a string, or undefined if file not found
  */
 export async function getFileContent(
   token: string,
   filePath: string,
+  ref?: string,
 ): Promise<string | undefined> {
   try {
-    // First, check if file exists locally
-    try {
-      await access(filePath, constants.F_OK);
-      core.info(`Found file locally: ${filePath}`);
-      const content = await readFile(filePath, 'utf8');
-      return content;
-    } catch {
-      // File doesn't exist locally, try to download from GitHub
-      core.info(
-        `File not found locally, attempting to download from GitHub: ${filePath}`,
-      );
+    if (!ref) {
+      try {
+        await access(filePath, constants.F_OK);
+        core.info(`Found file locally: ${filePath}`);
+        const content = await readFile(filePath, 'utf8');
+        return content;
+      } catch {
+        // File doesn't exist locally, continue to git method
+        core.debug(`File not found locally: ${filePath}`);
+      }
     }
 
+    if (!token) {
+      core.warning(
+        `No token provided and file not found locally or in git: ${filePath}`,
+      );
+      return undefined;
+    }
+
+    core.info(
+      `File not found in git, attempting to download from GitHub: ${filePath}`,
+    );
     const { octokit, owner, repo } = getOctokitAndRepo(token);
 
-    const response = await octokit.rest.repos.getContent({
+    const apiParams: {
+      owner: string;
+      repo: string;
+      path: string;
+      ref?: string;
+    } = {
       owner,
       repo,
       path: filePath,
-    });
+    };
+    if (ref) {
+      apiParams.ref = ref;
+    }
+
+    const response = await octokit.rest.repos.getContent(apiParams);
 
     // GitHub API returns base64 encoded content for files
     if (
@@ -342,5 +390,60 @@ export async function getFileContent(
   } catch (err) {
     core.warning(`Failed to get file content for ${filePath}: ${String(err)}`);
     return undefined;
+  }
+}
+
+/**
+ * Get all RC (Release Candidate) tags since a baseline version using GitHub API.
+ * This function fetches RC tags from GitHub repository tags only.
+ */
+export async function getReleaseCandidates(
+  token: string,
+  baseline: SemanticVersion,
+): Promise<Array<{ name: string }>> {
+  try {
+    if (!token) {
+      core.debug('No token provided for GitHub API');
+      return [];
+    }
+
+    const ctx = github.context;
+    const owner = ctx.repo.owner;
+    const repo = ctx.repo.repo;
+    const octokit = github.getOctokit(token);
+
+    // Fetch only repository tags (not releases)
+    const per_page = 100;
+    const allTags: Array<{ name: string }> = [];
+
+    // Fetch tag names (paged)
+    let page = 1;
+    while (true) {
+      const res = await octokit.rest.repos.listTags({
+        owner,
+        repo,
+        per_page,
+        page,
+      });
+      if (!res || !Array.isArray(res.data) || res.data.length === 0) break;
+      for (const t of res.data) {
+        if (t.name) {
+          allTags.push({ name: t.name });
+        }
+      }
+      if (res.data.length < per_page) break;
+      page += 1;
+    }
+
+    // Use shared filtering logic
+    const results = filterRCTagsByBaseline(allTags, baseline);
+
+    core.info(
+      `Found ${results.length} release-candidate tag(s) from GitHub API since latest release`,
+    );
+    return results;
+  } catch (err) {
+    core.debug(`getReleaseCandidatesSinceLatestRelease failed: ${String(err)}`);
+    return [];
   }
 }

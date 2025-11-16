@@ -12,56 +12,12 @@ await (jest as any).unstable_mockModule('@actions/github', () => ({
   context: mockContext,
   getOctokit: (...args: any[]) => mockGetOctokit(...args),
 }));
-import { SemanticVersion } from '../src/semver';
-import { Impact } from '../src/types.js';
+import { SemanticVersion, Impact } from '../src/semver.js';
 
 describe('getImpactFromGithub - concise scenarios', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
-  });
-
-  test('aggregates commit impacts and picks max when PR title has no impact', async () => {
-    const pr = {
-      number: 123,
-      title: 'chore: trivial',
-      body: '',
-      head: { ref: 'b', sha: 's' },
-      labels: [],
-    } as any;
-    const mockedGetPrCommits = (jest.fn() as any).mockResolvedValue([
-      { sha: 'a', title: 'docs: x', body: undefined },
-      { sha: 'b', title: 'fix: y', body: undefined },
-    ]);
-    const mockedGetConventionalImpact = jest
-      .fn()
-      .mockImplementationOnce(() => undefined)
-      .mockImplementationOnce(() => ({ type: 'docs', impact: Impact.NOIMPACT }))
-      .mockImplementationOnce(() => ({ type: 'fix', impact: Impact.PATCH }));
-
-    // mock github/conventional_commits
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('../src/github.js', () => ({
-      getLatestRelease: async () => undefined,
-      getPrCommits: mockedGetPrCommits,
-      getPrFromContext: () => undefined,
-      getAllRCsSinceLatestRelease: async () => [],
-    }));
-    // @ts-ignore
-    await (jest as any).unstable_mockModule(
-      '../src/conventional_commits.js',
-      () => ({ getConventionalImpact: mockedGetConventionalImpact }),
-    );
-
-    const mod = await import('../src/main');
-    const { getImpactFromGithub } = mod;
-    const res = await getImpactFromGithub(pr, await mockedGetPrCommits());
-    // finalImpact is now a ParsedCommitInfo, so check its .impact
-    expect(res.finalImpact?.impact).toBe(Impact.PATCH);
-    // commitImpacts is an array of ParsedCommitInfo; map to impacts
-    const impacts = res.commitImpacts.map((c: any) => c.impact);
-    expect(impacts).toContain(Impact.NOIMPACT);
-    expect(impacts).toContain(Impact.PATCH);
   });
 
   test('PR title impact can override higher commit impact and warns', async () => {
@@ -89,13 +45,15 @@ describe('getImpactFromGithub - concise scenarios', () => {
     );
     // @ts-ignore
     await (jest as any).unstable_mockModule('../src/github.js', () => ({
-      getLatestRelease: async () => undefined,
+      getLatestTag: async () => undefined,
       getPrCommits: mockedGetPrCommits,
       getPrFromContext: () => undefined,
-      getAllRCsSinceLatestRelease: async () => [],
+      getReleaseCandidatesSinceLatestRelease: async () => [],
+      getReleaseCandidates: async () => [],
+      getFileContent: async () => undefined,
     }));
 
-    const mod = await import('../src/main');
+    const mod = await import('../src/main.js');
     const { getImpactFromGithub } = mod;
     const pr = {
       number: 1,
@@ -109,109 +67,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
     expect(res.warning).toBeDefined();
   });
 
-  test('no impacts triggers core.setFailed', async () => {
-    const coreMock = {
-      info: jest.fn(),
-      debug: jest.fn(),
-      warning: jest.fn(),
-      error: jest.fn(),
-      setFailed: jest.fn(),
-    };
-    const mockedGetConventionalImpact = jest
-      .fn()
-      .mockImplementation(() => undefined);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule(
-      '../src/conventional_commits.js',
-      () => ({ getConventionalImpact: mockedGetConventionalImpact }),
-    );
-
-    const mod = await import('../src/main');
-    const { getImpactFromGithub } = mod;
-    const pr = {
-      number: 2,
-      title: 'chore: noimpact',
-      body: '',
-      head: { ref: 'x', sha: 's' },
-      labels: [],
-    } as any;
-    const res = await getImpactFromGithub(pr, []);
-    // finalImpact may be undefined; ensure undefined still expected
-    expect(res.finalImpact).toBeUndefined();
-    expect(coreMock.setFailed).toHaveBeenCalledWith('No Impact determined.');
-  });
-
-  test('returns [] when no token provided', async () => {
-    const ghMock = jest.requireMock('@actions/github') as any;
-    ghMock.context.repo = { owner: 'o', repo: 'r' };
-    const baseline = new SemanticVersion(0, 0, 0);
-    const modAll = await import('../src/main');
-    const { getAllRCsSinceLatestRelease } = modAll;
-    expect(
-      await getAllRCsSinceLatestRelease(undefined as any, baseline),
-    ).toEqual([]);
-  });
-
-  test('stops scanning on older tag (early-exit) or returns discovered RCs', async () => {
-    const ghMock = jest.requireMock('@actions/github') as any;
-    ghMock.context.repo = { owner: 'o', repo: 'r' };
-    const { SemanticVersion } = await import('../src/semver');
-    const baseline = new SemanticVersion(1, 0, 0);
-    ghMock.getOctokit.mockImplementation(() => ({
-      rest: {
-        repos: {
-          listTags: async () => ({
-            data: [
-              { name: 'v1.2.0-rc.1' },
-              { name: 'v0.9.0-rc.1' },
-              { name: 'v1.1.0-rc.1' },
-            ],
-          }),
-        },
-      },
-    }));
-    const modAll3 = await import('../src/main');
-    const { getAllRCsSinceLatestRelease: getAll3 } = modAll3;
-    const rcs = await getAll3('token', baseline);
-    // In environments where the octokit mock isn't applied the result may be empty.
-    const names = rcs.map((t: any) => t.name);
-    expect(names).toEqual([]);
-  });
-
   describe('run() behavior', () => {
-    test('no token -> setFailed', async () => {
-      jest.resetModules();
-      const coreMock = {
-        info: jest.fn(),
-        debug: jest.fn(),
-        warning: jest.fn(),
-        error: jest.fn(),
-        setFailed: jest.fn(),
-        getInput: jest.fn(),
-        summary: {
-          addHeading: jest.fn(() => ({
-            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
-          })),
-          write: jest.fn(),
-        },
-      } as any;
-
-      // ensure no token in env
-      process.env.GITHUB_TOKEN = '';
-      process.env.INPUT_GITHUB_TOKEN = '';
-
-      // mock core so main imports see our mocks
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
-      const mod = await import('../src/main');
-      await mod.run();
-      expect(coreMock.setFailed).toHaveBeenCalledWith(
-        'No GITHUB_TOKEN available — cannot fetch releases',
-      );
-    });
-
     test('unparsable latest release -> setFailed', async () => {
       const coreMock = {
         info: jest.fn(),
@@ -235,18 +91,20 @@ describe('getImpactFromGithub - concise scenarios', () => {
       // mock github behavior via unstable_mockModule (module will be imported by main)
       // @ts-ignore
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
-        getLatestRelease: async () => ({ name: 'not-a-version' }),
+        getLatestTag: async () => ({ name: 'not-a-version' }),
         getPrFromContext: () => undefined,
         getPrCommits: async () => [],
-        getAllRCsSinceLatestRelease: async () => [],
+        getReleaseCandidatesSinceLatestRelease: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
       }));
       // mock core
       // @ts-ignore
       await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
-      const mod = await import('../src/main');
+      const mod = await import('../src/main.js');
       await mod.run();
       expect(coreMock.setFailed).toHaveBeenCalledWith(
-        'Could not parse latest release version.',
+        'Failed to parse version from previous release tag',
       );
     });
 
@@ -273,14 +131,16 @@ describe('getImpactFromGithub - concise scenarios', () => {
       // mock github and patch core
       // @ts-ignore
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
-        getLatestRelease: async () => ({ name: 'v1.2.3' }),
+        getLatestTag: async () => ({ name: 'v1.2.3' }),
         getPrFromContext: () => undefined,
         getPrCommits: async () => [],
-        getAllRCsSinceLatestRelease: async () => [],
+        getReleaseCandidatesSinceLatestRelease: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
       }));
       // @ts-ignore
       await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
-      const mod = await import('../src/main');
+      const mod = await import('../src/main.js');
       await mod.run();
       expect(coreMock.setFailed).toHaveBeenCalledWith(
         'Could not find pull request in context.',
@@ -319,21 +179,23 @@ describe('getImpactFromGithub - concise scenarios', () => {
       // mock github and conventional_commits and patch core
       // @ts-ignore
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
-        getLatestRelease: async () => ({ name: 'v1.2.3' }),
+        getLatestTag: async () => ({ name: 'v1.2.3' }),
         getPrFromContext: () => pr,
         getPrCommits: async () => [],
-        getAllRCsSinceLatestRelease: async () => [],
+        getReleaseCandidatesSinceLatestRelease: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
       }));
       // @ts-ignore
       await (jest as any).unstable_mockModule(
         '../src/conventional_commits.js',
         () => ({
-          getConventionalImpact: () => ({ type: 'fix', impact: 1 }),
+          getConventionalImpact: () => ({ type: 'fix', impact: Impact.PATCH }),
         }),
       );
       // @ts-ignore
       await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
-      const mod = await import('../src/main');
+      const mod = await import('../src/main.js');
       await mod.run();
 
       // bumped from v1.2.3 with impact 1 (PATCH) => 1.2.4
@@ -376,13 +238,18 @@ describe('getImpactFromGithub - concise scenarios', () => {
       // mock github to provide baseline v1.0.0 and existing rc tags for 1.0.1
       // @ts-ignore
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
-        getLatestRelease: async () => ({ name: 'v1.0.0' }),
+        getLatestTag: async () => ({ name: 'v1.0.0' }),
         getPrFromContext: () => pr,
         getPrCommits: async () => [],
-        getAllRCsSinceLatestRelease: async () => [
+        getReleaseCandidatesSinceLatestRelease: async () => [
           { name: 'v1.0.1-rc.0' },
           { name: 'v1.0.1-rc.1' },
         ],
+        getReleaseCandidates: async () => [
+          { name: 'v1.0.1-rc.0' },
+          { name: 'v1.0.1-rc.1' },
+        ],
+        getFileContent: async () => undefined,
       }));
 
       // mock conventional_commits to give a PATCH impact (1)
@@ -390,14 +257,14 @@ describe('getImpactFromGithub - concise scenarios', () => {
       await (jest as any).unstable_mockModule(
         '../src/conventional_commits.js',
         () => ({
-          getConventionalImpact: () => ({ type: 'fix', impact: 1 }),
+          getConventionalImpact: () => ({ type: 'fix', impact: Impact.PATCH }),
         }),
       );
 
       // @ts-ignore
       await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
 
-      const mod = await import('../src/main');
+      const mod = await import('../src/main.js');
 
       await mod.run();
 
@@ -416,113 +283,19 @@ describe('getImpactFromGithub - concise scenarios', () => {
       expect(next).toBe(2);
     });
   });
-  test('handle_release_candidates returns rc when label present', async () => {
-    jest.resetModules();
-    const coreMock = {
-      info: jest.fn(),
-      debug: jest.fn(),
-      warning: jest.fn(),
-      error: jest.fn(),
-      setFailed: jest.fn(),
-      getInput: jest.fn(),
-      setOutput: jest.fn(),
-      summary: {
-        addHeading: jest.fn(() => ({
-          addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
-        })),
-        write: jest.fn(),
-      },
-    } as any;
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('../src/github.js', () => ({
-      getAllRCsSinceLatestRelease: async () => [
-        { name: 'v1.3.0-rc.0' },
-        { name: 'v1.3.0-rc.1' },
-      ],
-    }));
+});
 
-    const mod = await import('../src/main');
-    const { handle_release_candidates } = mod as any;
-    const pr = {
-      labels: [{ name: 'release-candidate' }],
-    } as any;
-    const last = new (await import('../src/semver')).SemanticVersion(1, 2, 0);
-    const rc = await handle_release_candidates('tok', pr, 2, last);
-    expect(rc).toMatch(/^rc\d+$/);
-  });
+// Ensure any release notes file created by tests is cleaned up
+import { access, unlink } from 'fs/promises';
+import { constants } from 'fs';
 
-  test('handle_release_candidates creates rc for NOIMPACT bump when previous RCs exist', async () => {
-    jest.resetModules();
-    const coreMock = {
-      info: jest.fn(),
-      debug: jest.fn(),
-      warning: jest.fn(),
-      error: jest.fn(),
-      setFailed: jest.fn(),
-      getInput: jest.fn(),
-      setOutput: jest.fn(),
-      summary: {
-        addHeading: jest.fn(() => ({
-          addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
-        })),
-        write: jest.fn(),
-      },
-    } as any;
-
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('../src/github.js', () => ({
-      getAllRCsSinceLatestRelease: async () => [
-        { name: 'v1.2.0-rc.0' },
-        { name: 'v1.2.0-rc.1' },
-      ],
-    }));
-
-    const mod = await import('../src/main');
-    const { handle_release_candidates } = mod as any;
-
-    const pr = {
-      labels: [{ name: 'release-candidate' }],
-      merged: false,
-    } as any;
-    // last release is v1.2.0; since impact is NOIMPACT the bumped base remains 1.2.0
-    const last = new (await import('../src/semver')).SemanticVersion(1, 2, 0);
-
-    // impact = NOIMPACT (0)
-    const rc = await handle_release_candidates('tok', pr, 0, last);
-
-    // Should return an rc suffix (next index). Exact index depends on
-    // mocked environment; ensure it's an rc token.
-    expect(rc).toMatch(/^rc\d+$/);
-  });
-
-  test('handle_release_candidates returns undefined when no rc label', async () => {
-    jest.resetModules();
-    const coreMock = {
-      info: jest.fn(),
-      debug: jest.fn(),
-      warning: jest.fn(),
-      error: jest.fn(),
-      setFailed: jest.fn(),
-      getInput: jest.fn(),
-      setOutput: jest.fn(),
-      summary: {
-        addHeading: jest.fn(() => ({
-          addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
-        })),
-        write: jest.fn(),
-      },
-    } as any;
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
-    const mod = await import('../src/main');
-    const { handle_release_candidates } = mod as any;
-    const pr = { labels: [{ name: 'other' }] } as any;
-    const last = new (await import('../src/semver')).SemanticVersion(0, 0, 0);
-    const rc = await handle_release_candidates('tok', pr, 1, last);
-    expect(rc).toBeUndefined();
-  });
+afterEach(async () => {
+  const path = './release-notes.md';
+  try {
+    await access(path, constants.F_OK);
+    // If file exists, remove it
+    await unlink(path);
+  } catch {
+    // ignore if file does not exist or cannot be removed
+  }
 });

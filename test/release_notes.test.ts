@@ -1,5 +1,5 @@
 import { generateReleaseNotes } from '../src/release_notes.js';
-import type { Commit } from '../src/github.js';
+import type { Commit } from '../src/git.js';
 
 describe('generateReleaseNotes', () => {
   test('groups commits into sections and formats entries', () => {
