@@ -35,7 +35,7 @@ jobs:
           build-metadata: ${{ github.sha }}
 ```
 
-Please note that running this action from a non-fixed version is _not_ supported
+Please note that running this action from a non-fixed version or main is _not_ supported
 
 ### Inputs
 

@@ -20,7 +20,7 @@ concurrency:
 jobs:
   semVersie:
     name: semVersie
-    runs-on: semversie-runner
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
@@ -52,10 +52,9 @@ jobs:
   release:
     name: Create Release
     needs: semVersie
-    runs-on: semversie-runner
+    runs-on: ubuntu-latest
     permissions:
       contents: write # to be able to push commits and create releases
-    if: needs.semVersie.outputs.release == 'true'
     steps:
       - uses: actions/checkout@v6
       - name: Install Node.js
@@ -81,6 +80,12 @@ jobs:
           git status
           git commit -m 'chore: bump version to ${{ needs.semVersie.outputs.version }}'
           git push --set-upstream origin release-${{ needs.semVersie.outputs.version }}
+      - name: Tag Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag ${{ needs.semVersie.outputs.tag }}
+          git push origin ${{ needs.semVersie.outputs.tag }}
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -89,7 +94,7 @@ jobs:
             --title '${{ needs.semVersie.outputs.tag }}' \
             --notes '${{ needs.semVersie.outputs.release-notes }}' \
             $([[ '${{ needs.semVersie.outputs.prerelease }}' == 'true' ]] && echo '--prerelease' || echo '')
-      - name: clean up branch
-        if: always()
-        run: |
-          git push origin --delete release-${{ needs.semVersie.outputs.version }}
+      # - name: clean up branch
+      #   if: always()
+      #   run: |
+      #     git push origin --delete release-${{ needs.semVersie.outputs.version }}
