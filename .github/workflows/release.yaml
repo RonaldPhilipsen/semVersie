@@ -81,6 +81,12 @@ jobs:
           git status
           git commit -m 'chore: bump version to ${{ needs.semVersie.outputs.version }}'
           git push --set-upstream origin release-${{ needs.semVersie.outputs.version }}
+      - name: Tag Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag ${{ needs.semVersie.outputs.tag }}
+          git push origin ${{ needs.semVersie.outputs.tag }}
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
