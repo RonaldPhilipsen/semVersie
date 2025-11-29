@@ -62,21 +62,22 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
+      - name: install dependencies
+        run: |
+          npm install
       - name: update version in package.json
         run: |
           npm version ${{ needs.semVersie.outputs.version }} --no-git-tag-version
       - name: build distribution
         run: |
-          npm install
           npm run build
       - name: Commit version bump
-        if: needs.semVersie.outputs.release == 'true'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git switch -c release-${{ needs.semVersie.outputs.version }}
           # temporarily unignore dist/ to commit built files
-          git add --force dist/ dist/index.js dist/package.json package.json package-lock.json
+          git add --force dist/* package.json package-lock.json
           git status
           git commit -m 'chore: bump version to ${{ needs.semVersie.outputs.version }}'
           git push --set-upstream origin release-${{ needs.semVersie.outputs.version }}
