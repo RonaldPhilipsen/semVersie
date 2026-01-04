@@ -1,12 +1,7 @@
 name: 'Qualify'
 
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-    branches:
-      - main
+  push:
 
 concurrency:
   group: 'qualify-${{ github.event.pull_request.head.sha }}'
