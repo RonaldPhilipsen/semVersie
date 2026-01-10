@@ -316,7 +316,7 @@ export async function run_github(
     core.setOutput('release-notes', release_notes);
   } else {
     core.error(
-      `Release notes length (${release_notes.length}) exceeds 10,000 characters, Refusing to populate output. 
+      `Release notes length (${release_notes.length}) exceeds 10,000 characters, Refusing to populate output.
       Consider using the 'release-notes-file' output for large release notes.`,
     );
   }
@@ -342,7 +342,10 @@ export async function run_github(
 
 export async function run() {
   try {
-    const token = process.env.GITHUB_TOKEN || process.env.INPUT_GITHUB_TOKEN;
+    const token = core.getInput('github-token', {
+      required: false,
+      trimWhitespace: true,
+    });
 
     const release_notes_format_input = core.getInput('release-notes-format', {
       required: false,
@@ -350,8 +353,10 @@ export async function run() {
     });
 
     if (!token) {
-      core.warning('No GITHUB_TOKEN available running via local git.');
-      await run_local_git(release_notes_format_input);
+      core.setFailed(
+        'No github-token provided. The token could be automatically provided via the default value. ' +
+          'If you explicitly set it to an empty string, please remove that configuration.',
+      );
       return;
     }
 
