@@ -44,8 +44,6 @@ jobs:
         run: npm run build
       - id: semVersie
         name: semVersie
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         uses: ./
         with:
           release-notes-format: 'docs/resources/release-format.md'
