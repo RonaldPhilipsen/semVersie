@@ -342,10 +342,7 @@ export async function run_github(
 
 export async function run() {
   try {
-    const token = core.getInput('github-token', {
-      required: false,
-      trimWhitespace: true,
-    });
+    const token = process.env.GITHUB_TOKEN || process.env.INPUT_GITHUB_TOKEN;
 
     const release_notes_format_input = core.getInput('release-notes-format', {
       required: false,
