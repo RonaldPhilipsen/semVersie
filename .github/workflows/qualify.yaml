@@ -2,6 +2,7 @@ name: 'Qualify'
 
 on:
   push:
+  pull_request:
 
 concurrency:
   group: 'qualify-${{ github.event.pull_request.head.sha }}'
