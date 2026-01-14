@@ -11,7 +11,7 @@ inputs:
   github-token:
     description: 'GitHub token for API access'
     default: ${{ github.token }}
-    required: true
+    required: false
   build-metadata:
     description: Build metadata to append to the version, e.g. "build_45"
     required: false
