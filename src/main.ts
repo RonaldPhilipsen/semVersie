@@ -316,7 +316,7 @@ export async function run_github(
     core.setOutput('release-notes', release_notes);
   } else {
     core.error(
-      `Release notes length (${release_notes.length}) exceeds 10,000 characters, Refusing to populate output. 
+      `Release notes length (${release_notes.length}) exceeds 10,000 characters, Refusing to populate output.
       Consider using the 'release-notes-file' output for large release notes.`,
     );
   }
@@ -342,7 +342,11 @@ export async function run_github(
 
 export async function run() {
   try {
-    const token = process.env.GITHUB_TOKEN || process.env.INPUT_GITHUB_TOKEN;
+    const token =
+      core.getInput('github-token', {
+        required: false,
+        trimWhitespace: true,
+      }) || process.env.GITHUB_TOKEN;
 
     const release_notes_format_input = core.getInput('release-notes-format', {
       required: false,
