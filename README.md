@@ -43,7 +43,15 @@ To automatically label PRs with their version impact:
 name: PR Labeling
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types:
+      - opened
+      - closed
+      - edited
+      - labeled
+      - unlabeled
+      - synchronize
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -69,13 +77,13 @@ Please note that running this action from a non-fixed version is _not_ supported
 
 ### Inputs
 
-| Input                  | Description                                                                                                                        | Required | Default                                                                                                            |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| `github-token`         | GitHub token for API access                                                                                                        | No       | `${{ github.token }}`                                                                                              |
-| `build-metadata`       | Build metadata to include in the semver                                                                                            | No       | ``                                                                                                                 |
-| `release-notes-format` | Format to fill in for the release notes generation                                                                                 | No       | `<INSERT_RELEASE_NOTES_HERE>` key will be replaced with release notes, [example](docs/resources/release-format.md) |
-| `add-pr-label`         | Whether to add a label to the PR indicating the version impact. Requires `issues: write` permission.                               | No       | `false`                                                                                                            |
-| `label-prefix`         | Whether to add the "semVersie:" prefix to PR labels (e.g., "semVersie:minor" instead of "minor")                                   | No       | `false`                                                                                                            |
+| Input                  | Description                                                                                                                        | Required | Default                                                                                                            | Permissions          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| `github-token`         | GitHub token for API access                                                                                                        | No       | `${{ github.token }}`                                                                                              | `pull-requests: read` |
+| `build-metadata`       | Build metadata to include in the semver                                                                                            | No       | ``                                                                                                                 | -                    |
+| `release-notes-format` | Format to fill in for the release notes generation                                                                                 | No       | `<INSERT_RELEASE_NOTES_HERE>` key will be replaced with release notes, [example](docs/resources/release-format.md) | -                    |
+| `add-pr-label`         | Whether to add a label to the PR indicating the version impact                                                                     | No       | `false`                                                                                                            | `issues: write`      |
+| `label-prefix`         | Whether to add the "semVersie:" prefix to PR labels (e.g., "semVersie:minor" instead of "minor")                                   | No       | `false`                                                                                                            | -                    |
 
 > **Note:** The `github-token` input has a default value and typically doesn't
 > need to be specified. If not provided, the action will fall back to local git
