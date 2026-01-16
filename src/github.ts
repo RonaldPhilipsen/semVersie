@@ -466,7 +466,7 @@ export async function ensureImpactLabels(
     const impactLabels = [
       {
         name: 'noimpact',
-        color: 'e4e669',
+        color: '8b949e',
         description: 'No version bump needed',
       },
       {
