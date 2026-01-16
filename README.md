@@ -35,15 +35,47 @@ jobs:
           build-metadata: ${{ github.sha }}
 ```
 
+#### With PR Labels
+
+To automatically label PRs with their version impact:
+
+```yaml
+name: PR Labeling
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write  # Required for adding labels
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Determine semver and label PR
+        uses: RonaldPhilipsen/semVersie@vX.Y.Z
+        with:
+          add-pr-label: true
+          label-prefix: false  # Set to true for "semVersie:minor" style labels
+```
+
 Please note that running this action from a non-fixed version is _not_ supported
 
 ### Inputs
 
-| Input                  | Description                                        | Required | Default                                                                                                            |
-| ---------------------- | -------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| `github-token`         | GitHub token for API access                        | No       | `${{ github.token }}`                                                                                              |
-| `build-metadata`       | Build metadata to include in the semver            | No       | ``                                                                                                                 |
-| `release-notes-format` | Format to fill in for the release notes generation | No       | `<INSERT_RELEASE_NOTES_HERE>` key will be replaced with release notes, [example](docs/resources/release-format.md) |
+| Input                  | Description                                                                                                                        | Required | Default                                                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `github-token`         | GitHub token for API access                                                                                                        | No       | `${{ github.token }}`                                                                                              |
+| `build-metadata`       | Build metadata to include in the semver                                                                                            | No       | ``                                                                                                                 |
+| `release-notes-format` | Format to fill in for the release notes generation                                                                                 | No       | `<INSERT_RELEASE_NOTES_HERE>` key will be replaced with release notes, [example](docs/resources/release-format.md) |
+| `add-pr-label`         | Whether to add a label to the PR indicating the version impact. Requires `issues: write` permission.                               | No       | `false`                                                                                                            |
+| `label-prefix`         | Whether to add the "semVersie:" prefix to PR labels (e.g., "semVersie:minor" instead of "minor")                                   | No       | `false`                                                                                                            |
 
 > **Note:** The `github-token` input has a default value and typically doesn't
 > need to be specified. If not provided, the action will fall back to local git
