@@ -343,10 +343,11 @@ describe('github module', () => {
     const mod = await import('../src/github.js');
 
     await mod.ensureImpactLabels('tok', '');
+    expect(createdLabels).toContain('noimpact');
     expect(createdLabels).toContain('patch');
     expect(createdLabels).toContain('minor');
     expect(createdLabels).toContain('major');
-    expect(createdLabels.length).toBe(3);
+    expect(createdLabels.length).toBe(4);
   });
 
   test('ensureImpactLabels creates labels with prefix', async () => {
@@ -379,10 +380,11 @@ describe('github module', () => {
     const mod = await import('../src/github.js');
 
     await mod.ensureImpactLabels('tok', 'semVersie:');
+    expect(createdLabels).toContain('semVersie:noimpact');
     expect(createdLabels).toContain('semVersie:patch');
     expect(createdLabels).toContain('semVersie:minor');
     expect(createdLabels).toContain('semVersie:major');
-    expect(createdLabels.length).toBe(3);
+    expect(createdLabels.length).toBe(4);
   });
 
   test('ensureImpactLabels skips existing labels', async () => {
@@ -415,10 +417,11 @@ describe('github module', () => {
     const mod = await import('../src/github.js');
 
     await mod.ensureImpactLabels('tok', '');
+    expect(createdLabels).toContain('noimpact');
     expect(createdLabels).toContain('major');
     expect(createdLabels).not.toContain('patch');
     expect(createdLabels).not.toContain('minor');
-    expect(createdLabels.length).toBe(1);
+    expect(createdLabels.length).toBe(2);
   });
 
   test('addImpactLabelToPr adds label to PR', async () => {

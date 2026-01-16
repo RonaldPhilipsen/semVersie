@@ -465,6 +465,11 @@ export async function ensureImpactLabels(
     // Define the impact labels with colors
     const impactLabels = [
       {
+        name: 'noimpact',
+        color: 'e4e669',
+        description: 'No version bump needed',
+      },
+      {
         name: 'patch',
         color: '0e8a16',
         description: 'Patch version bump (bug fixes)',

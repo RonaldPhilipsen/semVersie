@@ -306,7 +306,7 @@ export async function run_github(
 
   // Add PR label if requested
   const shouldAddLabel = core.getBooleanInput('add-pr-label');
-  if (shouldAddLabel && impact !== Impact.NOIMPACT) {
+  if (shouldAddLabel) {
     const useLabelPrefix = core.getBooleanInput('label-prefix');
     const labelPrefix = useLabelPrefix ? 'semVersie:' : '';
 
