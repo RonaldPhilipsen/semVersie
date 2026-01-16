@@ -71,9 +71,12 @@ jobs:
         run: |
           npm run build
       - name: Commit version bump
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git
           git switch -c release-${{ needs.semVersie.outputs.version }}
           # temporarily unignore dist/ to commit built files
           git add --force dist/* package.json package-lock.json
