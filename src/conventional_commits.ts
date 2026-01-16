@@ -37,9 +37,15 @@ export const TypeToImpactMapping = {
 
 export type ConventionalCommitType = keyof typeof TypeToImpactMapping;
 
-export interface ParsedCommitInfo {
-  type: ConventionalCommitType;
-  impact: Impact;
+export class ParsedCommitInfo {
+  constructor(
+    public type: ConventionalCommitType,
+    public impact: Impact,
+  ) {}
+
+  toString(): string {
+    return `${this.type} (${Impact[this.impact]})`;
+  }
 }
 
 export function getConventionalImpact(
@@ -116,5 +122,5 @@ export function ParseConventionalTitle(
     core.debug("Detected breaking change indicator '!' in title");
     impact = Impact.MAJOR;
   }
-  return { type, impact };
+  return new ParsedCommitInfo(type, impact);
 }
