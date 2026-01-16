@@ -155,6 +155,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
         error: jest.fn(),
         setFailed: jest.fn(),
         getInput: jest.fn(() => ''),
+        getBooleanInput: jest.fn(() => false),
         setOutput: jest.fn(),
         summary: {
           addHeading: jest.fn(() => ({
@@ -185,6 +186,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getReleaseCandidatesSinceLatestRelease: async () => [],
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
       // @ts-ignore
       await (jest as any).unstable_mockModule(
@@ -215,6 +218,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
         error: jest.fn(),
         setFailed: jest.fn(),
         getInput: jest.fn(() => ''),
+        getBooleanInput: jest.fn(() => false),
         setOutput: jest.fn(),
         summary: {
           addHeading: jest.fn(() => ({
@@ -250,6 +254,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
           { name: 'v1.0.1-rc.1' },
         ],
         getFileContent: async () => undefined,
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
 
       // mock conventional_commits to give a PATCH impact (1)
@@ -281,6 +287,74 @@ describe('getImpactFromGithub - concise scenarios', () => {
       const tags = ['v1.0.1-rc.0', 'v1.0.1-rc.1'];
       const next = SemanticVersion.nextRcIndex(base, tags);
       expect(next).toBe(2);
+    });
+
+    test('add-pr-label enabled calls ensureImpactLabels and addImpactLabelToPr', async () => {
+      const ensureLabelsCalled = jest.fn();
+      const addLabelCalled = jest.fn();
+
+      const coreMock = {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warning: jest.fn(),
+        error: jest.fn(),
+        setFailed: jest.fn(),
+        getInput: jest.fn(() => ''),
+        getBooleanInput: jest.fn((name: string) => {
+          if (name === 'add-pr-label') return true;
+          if (name === 'label-prefix') return true;
+          return false;
+        }),
+        setOutput: jest.fn(),
+        summary: {
+          addHeading: jest.fn(() => ({
+            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          })),
+          write: jest.fn(),
+        },
+      } as any;
+
+      jest.resetModules();
+      process.env.GITHUB_TOKEN = 'tok';
+
+      const pr = {
+        number: 10,
+        title: 'feat: new feature',
+        body: '',
+        head: { ref: 'b', sha: 's' },
+        labels: [],
+      };
+
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+        getLatestTag: async () => ({ name: 'v1.0.0' }),
+        getPrFromContext: () => pr,
+        getPrCommits: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
+        ensureImpactLabels: ensureLabelsCalled,
+        addImpactLabelToPr: addLabelCalled,
+      }));
+      // @ts-ignore
+      await (jest as any).unstable_mockModule(
+        '../src/conventional_commits.js',
+        () => ({
+          getConventionalImpact: () => ({ type: 'feat', impact: Impact.MINOR }),
+        }),
+      );
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+      const mod = await import('../src/main.js');
+      await mod.run();
+
+      // Verify that label functions were called
+      expect(ensureLabelsCalled).toHaveBeenCalledWith('tok', 'semVersie:');
+      expect(addLabelCalled).toHaveBeenCalledWith(
+        'tok',
+        10,
+        'minor',
+        'semVersie:',
+      );
     });
   });
 });
