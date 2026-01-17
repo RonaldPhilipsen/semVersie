@@ -303,6 +303,21 @@ export async function run_github(
   );
 
   core.info(`Final determined impact: ${String(impact)}`);
+
+  // Add PR label if requested
+  const shouldAddLabel = core.getBooleanInput('add-pr-label');
+  if (shouldAddLabel) {
+    const useLabelPrefix = core.getBooleanInput('label-prefix');
+    const labelPrefix = useLabelPrefix ? 'semVersie:' : '';
+
+    // Ensure impact labels exist on the repository
+    await gh.ensureImpactLabels(token, labelPrefix);
+
+    // Add the appropriate label to the PR
+    const impactName = Impact[impact].toLowerCase();
+    await gh.addImpactLabelToPr(token, pr.number, impactName, labelPrefix);
+  }
+
   const generated_release_notes = generateReleaseNotes(commits);
   const release_notes = release_notes_format.replace(
     '<INSERT_RELEASE_NOTES_HERE>',
