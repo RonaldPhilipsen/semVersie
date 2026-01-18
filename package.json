@@ -19,7 +19,7 @@
     ".": "./dist/index.js"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "ncc build src/index.ts -o dist -m",
