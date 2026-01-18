@@ -20,6 +20,17 @@ inputs:
     description: Path to a format file to brand the release notes
     required: false
     default: ''
+  add-pr-label:
+    description:
+      'Whether to add a label to the PR indicating the version impact'
+    required: false
+    default: 'false'
+  label-prefix:
+    description:
+      'Whether to add the "semVersie:" prefix to PR labels (e.g.,
+      "semVersie:minor" instead of "minor")'
+    required: false
+    default: 'true'
 outputs:
   release:
     description: Whether a release should be created (true/false)
