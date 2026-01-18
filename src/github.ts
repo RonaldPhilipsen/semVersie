@@ -447,3 +447,106 @@ export async function getReleaseCandidates(
     return [];
   }
 }
+
+/**
+ * Ensure that all impact labels exist on the repository.
+ * Creates any missing labels with appropriate colors.
+ *
+ * @param token GitHub token for API access
+ * @param labelPrefix Optional prefix for label names (e.g., "semVersie:")
+ */
+export async function ensureImpactLabels(
+  token: string,
+  labelPrefix: string = '',
+): Promise<void> {
+  try {
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+
+    // Define the impact labels with colors
+    const impactLabels = [
+      {
+        name: 'noimpact',
+        color: '8b949e',
+        description: 'No version bump needed',
+      },
+      {
+        name: 'patch',
+        color: '0e8a16',
+        description: 'Patch version bump (bug fixes)',
+      },
+      {
+        name: 'minor',
+        color: '1d76db',
+        description: 'Minor version bump (new features)',
+      },
+      {
+        name: 'major',
+        color: 'd93f0b',
+        description: 'Major version bump (breaking changes)',
+      },
+    ];
+
+    // Get existing labels
+    const existingLabels = await octokit.rest.issues.listLabelsForRepo({
+      owner,
+      repo,
+    });
+    const existingLabelNames = new Set(
+      existingLabels.data.map((label) => label.name),
+    );
+
+    // Create missing labels
+    for (const label of impactLabels) {
+      const fullLabelName = labelPrefix
+        ? `${labelPrefix}${label.name}`
+        : label.name;
+
+      if (!existingLabelNames.has(fullLabelName)) {
+        core.info(`Creating label: ${fullLabelName}`);
+        await octokit.rest.issues.createLabel({
+          owner,
+          repo,
+          name: fullLabelName,
+          color: label.color,
+          description: label.description,
+        });
+      } else {
+        core.debug(`Label already exists: ${fullLabelName}`);
+      }
+    }
+  } catch (err) {
+    core.warning(`Failed to ensure impact labels: ${String(err)}`);
+  }
+}
+
+/**
+ * Add an impact label to a pull request.
+ *
+ * @param token GitHub token for API access
+ * @param prNumber Pull request number
+ * @param impactName The impact name (e.g., 'patch', 'minor', 'major')
+ * @param labelPrefix Optional prefix for the label name
+ */
+export async function addImpactLabelToPr(
+  token: string,
+  prNumber: number,
+  impactName: string,
+  labelPrefix: string = '',
+): Promise<void> {
+  try {
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+    const fullLabelName = labelPrefix
+      ? `${labelPrefix}${impactName}`
+      : impactName;
+
+    core.info(`Adding label '${fullLabelName}' to PR #${prNumber}`);
+    await octokit.rest.issues.addLabels({
+      owner,
+      repo,
+      issue_number: prNumber,
+      labels: [fullLabelName],
+    });
+  } catch (err) {
+    core.warning(`Failed to add label to PR #${prNumber}: ${String(err)}`);
+  }
+}
