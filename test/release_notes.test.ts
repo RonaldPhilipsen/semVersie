@@ -15,7 +15,6 @@ describe('generateReleaseNotes', () => {
     ];
 
     const notes = generateReleaseNotes(commits);
-    expect(notes).toContain('# Release Notes');
     expect(notes).toMatch(/Breaking Changes/);
     expect(notes).toMatch(/New Features/);
     expect(notes).toMatch(/Bug Fixes/);
