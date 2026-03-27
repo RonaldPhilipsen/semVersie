@@ -52,7 +52,6 @@ export function generateReleaseNotes(commits: Commit[]): string {
   }
 
   const lines: string[] = [];
-  lines.push('# Release Notes\n');
   if (breaking.length > 0) {
     lines.push(...getReleaseNoteSection('🚨 Breaking Changes', breaking));
   }
