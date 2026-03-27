@@ -1,5 +1,7 @@
 <img src="docs/resources/logo/semversie-final.svg" alt="Versie banner" width="60%" />
 
+# Release notes
+
 <INSERT_RELEASE_NOTES_HERE>
 
 :copyright: 2025 Ronald Philipsen
