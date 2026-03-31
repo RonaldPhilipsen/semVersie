@@ -50,7 +50,7 @@ jobs:
           fi
 
   zizmor:
-    runs-on: semversie-runner
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
       contents: read # only needed for private or internal repos
