@@ -8,34 +8,12 @@ import { SemanticVersion } from './semver.js';
 import type { Commit, Tag } from './git.js';
 import type { Endpoints } from '@octokit/types';
 
-/**
- * Minimal Pull Request interface capturing commonly-used fields.
- * This intentionally doesn't replicate the full GitHub API shape — add fields as needed.
- */
-export type PullRequest = {
-  number: number;
-  title: string;
-  body: string;
-  head: {
-    ref: string;
-    sha: string;
-    repo: { full_name?: string };
-  };
-  base?: {
-    ref: string;
-    sha: string;
-    repo: { full_name?: string };
-  };
-  labels: Array<{ name: string }>;
-  draft: boolean;
-  merged: boolean;
-  merge_commit_sha: string | null;
-  [k: string]: unknown;
-};
+export type PullRequest =
+  Endpoints['GET /repos/{owner}/{repo}/pulls/{pull_number}']['response']['data'];
 
-// Small helper to centralize payload->PR extraction logic.
-// We keep the cast narrow and local to avoid wide `any` usage while
-// keeping the extraction logic concise.
+type PullRequestFromCommit =
+  Endpoints['GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls']['response']['data'][number];
+
 function extractPullRequestFromPayload(ev: unknown): PullRequest | undefined {
   const payload = ev as
     | { event?: { pull_request?: PullRequest }; pull_request?: PullRequest }
@@ -50,9 +28,6 @@ export function getPrFromContext(): PullRequest | undefined {
   const ctx = github.context;
   return extractPullRequestFromPayload(ctx.payload as unknown);
 }
-
-type PullRequestFromCommit =
-  Endpoints['GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls']['response']['data'][number];
 
 async function getPrFromLatestCommit(
   token: string,
@@ -79,33 +54,12 @@ async function getPrFromLatestCommit(
     }
 
     const sourcePr = response.data[0] as PullRequestFromCommit;
-    const pr: PullRequest = {
-      number: sourcePr.number,
-      title: sourcePr.title ?? '',
-      body: sourcePr.body ?? '',
-      head: {
-        ref: sourcePr.head.ref,
-        sha: sourcePr.head.sha,
-        repo: { full_name: sourcePr.head.repo?.full_name },
-      },
-      base: sourcePr.base
-        ? {
-            ref: sourcePr.base.ref,
-            sha: sourcePr.base.sha,
-            repo: { full_name: sourcePr.base.repo?.full_name },
-          }
-        : undefined,
-      labels: Array.isArray(sourcePr.labels)
-        ? sourcePr.labels.map((label) => ({ name: String(label?.name ?? '') }))
-        : [],
-      draft: Boolean(sourcePr.draft),
-      merged: false,
-      merge_commit_sha:
-        sourcePr.merge_commit_sha === undefined
-          ? null
-          : sourcePr.merge_commit_sha,
-      ...sourcePr,
-    };
+    const prResponse = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: sourcePr.number,
+    });
+    const pr = prResponse.data as PullRequest;
 
     core.info(`Resolved PR #${pr.number} from latest commit ${commitSha}`);
     return pr;

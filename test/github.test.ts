@@ -64,6 +64,9 @@ describe('github module', () => {
           repos: {
             listPullRequestsAssociatedWithCommit: async () => ({ data: [pr] }),
           },
+          pulls: {
+            get: async () => ({ data: pr }),
+          },
         },
       }),
     };
