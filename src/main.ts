@@ -19,6 +19,8 @@ export type ImpactResult = {
   warning?: string;
 };
 
+const RELEASE_NOTES_PLACEHOLDER = '<INSERT_RELEASE_NOTES_HERE>';
+
 export async function getImpactFromGithub(
   pr: PullRequest,
   commits: Commit[],
@@ -208,7 +210,7 @@ export async function run_local_git(release_notes_format_file: string) {
 
   const generated_release_notes = generateReleaseNotes(commits);
   const release_notes = release_notes_format.replace(
-    '<INSERT_RELEASE_NOTES_HERE>',
+    RELEASE_NOTES_PLACEHOLDER,
     generated_release_notes,
   );
   const filePath = './release-notes.md';
@@ -221,7 +223,7 @@ export async function run_github(
 ) {
   core.info('Running semVersie using GitHub API...');
 
-  let release_notes_format = '%S'; // Default format
+  let release_notes_format = RELEASE_NOTES_PLACEHOLDER; // Default format
   const formatContent = await gh.getFileContent(
     token,
     release_notes_format_file,
@@ -240,7 +242,7 @@ export async function run_github(
   const tag = await gh.getLatestTag(token);
   const last_release_version = get_last_release_version(tag);
   core.info('Resolving pull request title...');
-  const pr = gh.getPrFromContext();
+  const pr = await gh.getPrFromContextOrLatestCommit(token);
   if (!pr) {
     core.setFailed('Could not find pull request in context.');
     return;
@@ -320,7 +322,7 @@ export async function run_github(
 
   const generated_release_notes = generateReleaseNotes(commits);
   const release_notes = release_notes_format.replace(
-    '<INSERT_RELEASE_NOTES_HERE>',
+    RELEASE_NOTES_PLACEHOLDER,
     generated_release_notes,
   );
   const filePath = './release-notes.md';

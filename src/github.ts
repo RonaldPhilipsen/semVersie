@@ -6,35 +6,14 @@ import { LRUCache, filterRCTagsByBaseline } from './utils.js';
 import * as git from './git.js';
 import { SemanticVersion } from './semver.js';
 import type { Commit, Tag } from './git.js';
+import type { Endpoints } from '@octokit/types';
 
-/**
- * Minimal Pull Request interface capturing commonly-used fields.
- * This intentionally doesn't replicate the full GitHub API shape — add fields as needed.
- */
-export type PullRequest = {
-  number: number;
-  title: string;
-  body: string;
-  head: {
-    ref: string;
-    sha: string;
-    repo: { full_name?: string };
-  };
-  base?: {
-    ref: string;
-    sha: string;
-    repo: { full_name?: string };
-  };
-  labels: Array<{ name: string }>;
-  draft: boolean;
-  merged: boolean;
-  merge_commit_sha: string | null;
-  [k: string]: unknown;
-};
+export type PullRequest =
+  Endpoints['GET /repos/{owner}/{repo}/pulls/{pull_number}']['response']['data'];
 
-// Small helper to centralize payload->PR extraction logic.
-// We keep the cast narrow and local to avoid wide `any` usage while
-// keeping the extraction logic concise.
+type PullRequestFromCommit =
+  Endpoints['GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls']['response']['data'][number];
+
 function extractPullRequestFromPayload(ev: unknown): PullRequest | undefined {
   const payload = ev as
     | { event?: { pull_request?: PullRequest }; pull_request?: PullRequest }
@@ -48,6 +27,59 @@ function extractPullRequestFromPayload(ev: unknown): PullRequest | undefined {
 export function getPrFromContext(): PullRequest | undefined {
   const ctx = github.context;
   return extractPullRequestFromPayload(ctx.payload as unknown);
+}
+
+async function getPrFromLatestCommit(
+  token: string,
+): Promise<PullRequest | undefined> {
+  if (!token) return undefined;
+  const ctx = github.context;
+  const commitSha = ctx.sha ?? process.env.GITHUB_SHA;
+  if (!commitSha) {
+    core.debug('No commit SHA available to resolve PR from latest commit');
+    return undefined;
+  }
+
+  try {
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+    const response =
+      await octokit.rest.repos.listPullRequestsAssociatedWithCommit({
+        owner,
+        repo,
+        commit_sha: commitSha,
+      });
+    if (!Array.isArray(response.data) || response.data.length === 0) {
+      core.debug(`No PRs associated with commit ${commitSha}`);
+      return undefined;
+    }
+
+    const sourcePr = response.data[0] as PullRequestFromCommit;
+    const prResponse = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: sourcePr.number,
+    });
+    const pr = prResponse.data as PullRequest;
+
+    core.info(`Resolved PR #${pr.number} from latest commit ${commitSha}`);
+    return pr;
+  } catch (err) {
+    core.debug(
+      `getPrFromLatestCommit failed for commit ${commitSha}: ${String(err)}`,
+    );
+    return undefined;
+  }
+}
+
+/**
+ * Return the whole Pull Request object from the Actions context when available.
+ * If the payload does not contain a PR, try resolving a PR from the latest
+ * commit (push event fallback).
+ */
+export async function getPrFromContextOrLatestCommit(
+  token: string,
+): Promise<PullRequest | undefined> {
+  return getPrFromContext() ?? (await getPrFromLatestCommit(token));
 }
 
 function getOctokitAndRepo(token: string) {
@@ -190,8 +222,12 @@ export function getPrTitleFromContext(): string | undefined {
  */
 export async function getPrCommits(token: string): Promise<Commit[]> {
   try {
-    // Try to obtain a PullRequest object from context first; fall back to ref parsing
-    const pr = getPrFromContext();
+    // Try to obtain a PullRequest object from context first; fall back to latest commit
+    // lookup in push events and ref parsing.
+    let pr = getPrFromContext();
+    if (!pr && token) {
+      pr = await getPrFromContextOrLatestCommit(token);
+    }
     let pull_number: number | undefined = pr?.number;
     const ctx = github.context;
     if (!pull_number && ctx.ref) {
