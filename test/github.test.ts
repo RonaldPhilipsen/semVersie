@@ -41,6 +41,41 @@ describe('github module', () => {
     expect(mod3.getPrTitleFromContext()).toBe('T');
   });
 
+  test('getPrFromContextOrLatestCommit resolves PR from latest commit when payload missing', async () => {
+    const pr = {
+      number: 42,
+      title: 'From commit',
+      body: 'body',
+      head: { ref: 'branch', sha: 'abc123', repo: { full_name: 'o/r' } },
+      labels: [],
+      draft: false,
+      merged: false,
+      merge_commit_sha: null,
+    };
+
+    const ghMock = {
+      context: {
+        repo: { owner: 'o', repo: 'r' },
+        payload: {},
+        sha: 'abc123',
+      },
+      getOctokit: () => ({
+        rest: {
+          repos: {
+            listPullRequestsAssociatedWithCommit: async () => ({ data: [pr] }),
+          },
+        },
+      }),
+    };
+
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+    const mod = await import('../src/github.js');
+    const result = await mod.getPrFromContextOrLatestCommit('tok');
+    expect(result).toBeDefined();
+    expect(result!.number).toBe(42);
+  });
+
   test('getLatestTag dedupes concurrent calls', async () => {
     const calls: string[] = [];
     const octokit = {
@@ -201,6 +236,48 @@ describe('github module', () => {
     const mod = await import('../src/github.js');
     const res = await mod.getPrCommits('tok');
     expect(calls.length).toBe(1);
+    expect(res).toEqual([]);
+  });
+
+  test('getPrCommits resolves PR from latest commit when payload missing', async () => {
+    const pr = {
+      number: 99,
+      title: 'Pushed PR',
+      body: 'body',
+      head: { ref: 'branch', sha: 'commitsha', repo: { full_name: 'o/r' } },
+      labels: [],
+      draft: false,
+      merged: false,
+      merge_commit_sha: null,
+    };
+
+    const octokit = {
+      rest: {
+        repos: {
+          listPullRequestsAssociatedWithCommit: async () => ({ data: [pr] }),
+        },
+        pulls: {
+          listCommits: async () => ({ data: [] }),
+        },
+      },
+    };
+    const ghMock = {
+      context: {
+        repo: { owner: 'o', repo: 'r' },
+        payload: {},
+        sha: 'commitsha',
+      },
+      getOctokit: () => octokit,
+    };
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/core', () => ({
+      debug: () => {},
+      info: () => {},
+    }));
+    const mod = await import('../src/github.js');
+    const res = await mod.getPrCommits('tok');
     expect(res).toEqual([]);
   });
 
