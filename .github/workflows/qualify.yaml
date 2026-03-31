@@ -2,7 +2,6 @@ name: 'Qualify'
 
 on:
   push:
-  pull_request:
 
 concurrency:
   group: 'qualify-${{ github.ref }}'
