@@ -14,10 +14,30 @@ and understandable without limiting the useability to a few languages.
 
 ## Usage (GitHub Actions)
 
-Example workflow snippet that runs the action and exposes the computed version
-as a job output:
+Triggering the workflow is to be done `on: pull_request` with the following
+various recommended types:
 
 ```yaml
+on:
+  pull_request:
+    types:
+      - opened
+      - closed
+      - edited
+      - labeled
+      - unlabeled
+      - synchronize
+    branches:
+      - main
+```
+
+This workflow snippet runs the action and exposes the computed version as a job
+output:
+
+```yaml
+permissions:
+  contents: write
+
 jobs:
   version:
     name: semVersie
@@ -35,15 +55,40 @@ jobs:
           build-metadata: ${{ github.sha }}
 ```
 
+#### With PR Labels
+
+To automatically label PRs with their version impact, you will need extra
+permissions:
+
+```yaml
+permissions:
+  contents: write
+  pull-requests: write  # Required for adding the labels to the PR
+  issues: write  # Required for adding labels to the repository
+
+jobs:
+  version:
+    name: semVersie
+    runs-on: ubuntu-latest
+    steps:
+      - name: Calculate version and label PR
+        uses: RonaldPhilipsen/semVersie@vX.Y.Z
+          add-pr-label: true
+          # Optional: Enable or disable the "semVersie:" prefix of the labels
+          label-prefix: false
+```
+
 Please note that running this action from a non-fixed version is _not_ supported
 
 ### Inputs
 
-| Input                  | Description                                        | Required | Default                                                                                                            |
-| ---------------------- | -------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| `github-token`         | GitHub token for API access                        | No       | `${{ github.token }}`                                                                                              |
-| `build-metadata`       | Build metadata to include in the semver            | No       | ``                                                                                                                 |
-| `release-notes-format` | Format to fill in for the release notes generation | No       | `<INSERT_RELEASE_NOTES_HERE>` key will be replaced with release notes, [example](docs/resources/release-format.md) |
+| Input                  | Description                                                                                      | Required | Default                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `github-token`         | GitHub token for API access                                                                      | No       | `${{ github.token }}`                                                                                              |
+| `build-metadata`       | Build metadata to include in the semver                                                          | No       | ``                                                                                                                 |
+| `release-notes-format` | Format to fill in for the release notes generation                                               | No       | `<INSERT_RELEASE_NOTES_HERE>` key will be replaced with release notes, [example](docs/resources/release-format.md) |
+| `add-pr-label`         | Whether to add a label to the PR indicating the version impact                                   | No       | `false`                                                                                                            |
+| `label-prefix`         | Whether to add the "semVersie:" prefix to PR labels (e.g., "semVersie:minor" instead of "minor") | No       | `false`                                                                                                            |
 
 > **Note:** The `github-token` input has a default value and typically doesn't
 > need to be specified. If not provided, the action will fall back to local git

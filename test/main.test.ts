@@ -53,6 +53,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
       getReleaseCandidates: async () => [],
       getFileContent: async () => undefined,
       getPushCommits: async () => [],
+      ensureImpactLabels: async () => {},
+      addImpactLabelToPr: async () => {},
     }));
 
     const mod = await import('../src/main.js');
@@ -101,6 +103,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
         getPushCommits: async () => [],
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
       // mock core
       // @ts-ignore
@@ -143,6 +147,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
         getPushCommits: async () => [],
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
       // @ts-ignore
       await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
@@ -161,6 +167,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
         error: jest.fn(),
         setFailed: jest.fn(),
         getInput: jest.fn(() => ''),
+        getBooleanInput: jest.fn(() => false),
         setOutput: jest.fn(),
         summary: {
           addHeading: jest.fn(() => ({
@@ -193,6 +200,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
         getPushCommits: async () => [],
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
       // @ts-ignore
       await (jest as any).unstable_mockModule(
@@ -223,6 +232,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
         error: jest.fn(),
         setFailed: jest.fn(),
         getInput: jest.fn(() => ''),
+        getBooleanInput: jest.fn(() => false),
         setOutput: jest.fn(),
         summary: {
           addHeading: jest.fn(() => ({
@@ -260,6 +270,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         ],
         getFileContent: async () => undefined,
         getPushCommits: async () => [],
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
 
       // mock conventional_commits to give a PATCH impact (1)
@@ -326,6 +338,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getReleaseCandidatesSinceLatestRelease: async () => [],
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
       // Reset conventional_commits mock so the real parser is used
       // @ts-ignore
@@ -401,6 +415,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getReleaseCandidatesSinceLatestRelease: async () => [],
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
       // Mock conventional_commits to return undefined for non-conventional titles
       // @ts-ignore
@@ -449,6 +465,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getReleaseCandidatesSinceLatestRelease: async () => [],
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
       // Reset conventional_commits mock
       // @ts-ignore
@@ -503,6 +521,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getReleaseCandidatesSinceLatestRelease: async () => [],
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
       }));
       // @ts-ignore
       await (jest as any).unstable_mockModule(
@@ -536,6 +556,145 @@ describe('getImpactFromGithub - concise scenarios', () => {
       expect(coreMock.setOutput).toHaveBeenCalledWith('tag', 'v1.0.1');
       expect(coreMock.setOutput).toHaveBeenCalledWith('version', '1.0.1');
       expect(coreMock.setFailed).not.toHaveBeenCalled();
+    });
+
+    test('add-pr-label enabled calls ensureImpactLabels and addImpactLabelToPr', async () => {
+      const ensureLabelsCalled = jest.fn();
+      const addLabelCalled = jest.fn();
+
+      const coreMock = {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warning: jest.fn(),
+        error: jest.fn(),
+        setFailed: jest.fn(),
+        getInput: jest.fn(() => ''),
+        getBooleanInput: jest.fn((name: string) => {
+          if (name === 'add-pr-label') return true;
+          if (name === 'label-prefix') return true;
+          return false;
+        }),
+        setOutput: jest.fn(),
+        summary: {
+          addHeading: jest.fn(() => ({
+            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          })),
+          write: jest.fn(),
+        },
+      } as any;
+
+      jest.resetModules();
+      process.env.GITHUB_TOKEN = 'tok';
+
+      const pr = {
+        number: 10,
+        title: 'feat: new feature',
+        body: '',
+        head: { ref: 'b', sha: 's' },
+        labels: [],
+      };
+
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+        getLatestTag: async () => ({ name: 'v1.0.0' }),
+        getPrFromContext: () => pr,
+        getEventName: () => 'pull_request',
+        getPrCommits: async () => [],
+        getReleaseCandidatesSinceLatestRelease: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
+        getPushCommits: async () => [],
+        ensureImpactLabels: ensureLabelsCalled,
+        addImpactLabelToPr: addLabelCalled,
+      }));
+      // @ts-ignore
+      await (jest as any).unstable_mockModule(
+        '../src/conventional_commits.js',
+        () => ({
+          getConventionalImpact: () => ({ type: 'feat', impact: Impact.MINOR }),
+        }),
+      );
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+      const mod = await import('../src/main.js');
+      await mod.run();
+
+      // Verify that label functions were called
+      expect(ensureLabelsCalled).toHaveBeenCalledWith('tok', 'semVersie:');
+      expect(addLabelCalled).toHaveBeenCalledWith(
+        'tok',
+        10,
+        'minor',
+        'semVersie:',
+      );
+    });
+
+    test('add-pr-label with NOIMPACT adds no-impact label', async () => {
+      const ensureLabelsCalled = jest.fn();
+      const addLabelCalled = jest.fn();
+
+      const coreMock = {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warning: jest.fn(),
+        error: jest.fn(),
+        setFailed: jest.fn(),
+        getInput: jest.fn(() => ''),
+        getBooleanInput: jest.fn((name: string) => {
+          if (name === 'add-pr-label') return true;
+          return false;
+        }),
+        setOutput: jest.fn(),
+        summary: {
+          addHeading: jest.fn(() => ({
+            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          })),
+          write: jest.fn(),
+        },
+      } as any;
+
+      jest.resetModules();
+      process.env.GITHUB_TOKEN = 'tok';
+
+      const pr = {
+        number: 42,
+        title: 'docs: update readme',
+        body: '',
+        head: { ref: 'b', sha: 's' },
+        labels: [],
+      };
+
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+        getLatestTag: async () => ({ name: 'v1.0.0' }),
+        getPrFromContext: () => pr,
+        getEventName: () => 'pull_request',
+        getPrCommits: async () => [],
+        getReleaseCandidatesSinceLatestRelease: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
+        getPushCommits: async () => [],
+        ensureImpactLabels: ensureLabelsCalled,
+        addImpactLabelToPr: addLabelCalled,
+      }));
+      // @ts-ignore
+      await (jest as any).unstable_mockModule(
+        '../src/conventional_commits.js',
+        () => ({
+          getConventionalImpact: () => ({
+            type: 'docs',
+            impact: Impact.NOIMPACT,
+          }),
+        }),
+      );
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+      const mod = await import('../src/main.js');
+      await mod.run();
+
+      // Verify that label functions were called with no-impact
+      expect(ensureLabelsCalled).toHaveBeenCalledWith('tok', '');
+      expect(addLabelCalled).toHaveBeenCalledWith('tok', 42, 'noimpact', '');
     });
   });
 });
