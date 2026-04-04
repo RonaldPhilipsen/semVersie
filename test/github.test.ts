@@ -343,6 +343,98 @@ describe('github module', () => {
         eventName: 'push',
       },
       getOctokit: () => ({}),
+  test('ensureImpactLabels creates missing labels', async () => {
+    const createdLabels: string[] = [];
+    const octokit = {
+      rest: {
+        issues: {
+          listLabelsForRepo: async () => ({
+            data: [{ name: 'existing-label' }],
+          }),
+          createLabel: async ({ name }: { name: string }) => {
+            createdLabels.push(name);
+            return { data: { name } };
+          },
+        },
+      },
+    };
+    const ghMock = {
+      context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
+      getOctokit: () => octokit,
+    };
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/core', () => ({
+      info: jest.fn(),
+      debug: jest.fn(),
+      warning: jest.fn(),
+    }));
+    const mod = await import('../src/github.js');
+
+    await mod.ensureImpactLabels('tok', '');
+    expect(createdLabels).toContain('noimpact');
+    expect(createdLabels).toContain('patch');
+    expect(createdLabels).toContain('minor');
+    expect(createdLabels).toContain('major');
+    expect(createdLabels.length).toBe(4);
+  });
+
+  test('ensureImpactLabels creates labels with prefix', async () => {
+    const createdLabels: string[] = [];
+    const octokit = {
+      rest: {
+        issues: {
+          listLabelsForRepo: async () => ({
+            data: [],
+          }),
+          createLabel: async ({ name }: { name: string }) => {
+            createdLabels.push(name);
+            return { data: { name } };
+          },
+        },
+      },
+    };
+    const ghMock = {
+      context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
+      getOctokit: () => octokit,
+    };
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/core', () => ({
+      info: jest.fn(),
+      debug: jest.fn(),
+      warning: jest.fn(),
+    }));
+    const mod = await import('../src/github.js');
+
+    await mod.ensureImpactLabels('tok', 'semVersie:');
+    expect(createdLabels).toContain('semVersie:noimpact');
+    expect(createdLabels).toContain('semVersie:patch');
+    expect(createdLabels).toContain('semVersie:minor');
+    expect(createdLabels).toContain('semVersie:major');
+    expect(createdLabels.length).toBe(4);
+  });
+
+  test('ensureImpactLabels skips existing labels', async () => {
+    const createdLabels: string[] = [];
+    const octokit = {
+      rest: {
+        issues: {
+          listLabelsForRepo: async () => ({
+            data: [{ name: 'patch' }, { name: 'minor' }],
+          }),
+          createLabel: async ({ name }: { name: string }) => {
+            createdLabels.push(name);
+            return { data: { name } };
+          },
+        },
+      },
+    };
+    const ghMock = {
+      context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
+      getOctokit: () => octokit,
     };
     // @ts-ignore
     await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
