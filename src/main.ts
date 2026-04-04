@@ -215,11 +215,11 @@ export async function run_local_git(release_notes_format_file: string) {
   await writeFile(filePath, release_notes, 'utf8');
 }
 
-export async function run_github(
+export async function run_github_pr(
   token: string,
   release_notes_format_file: string,
 ) {
-  core.info('Running semVersie using GitHub API...');
+  core.info('Running semVersie for pull_request event...');
 
   let release_notes_format = '%S'; // Default format
   const formatContent = await gh.getFileContent(
@@ -340,6 +340,122 @@ export async function run_github(
   );
 }
 
+export async function run_github_push(
+  token: string,
+  release_notes_format_file: string,
+) {
+  core.info('Running semVersie for push event...');
+
+  let release_notes_format = '%S'; // Default format
+  const formatContent = await gh.getFileContent(
+    token,
+    release_notes_format_file,
+  );
+  if (formatContent !== undefined) {
+    release_notes_format = formatContent;
+    core.info(
+      `Successfully loaded release notes format from ${release_notes_format_file}`,
+    );
+  } else {
+    core.warning(
+      `Could not load release notes format from ${release_notes_format_file}, using default format`,
+    );
+  }
+
+  const tag = await gh.getLatestTag(token);
+  const last_release_version = get_last_release_version(tag);
+
+  const commits = await gh.getPushCommits(token);
+  if (commits.length === 0) {
+    core.info('No commits found in push event; skipping version bump.');
+    return;
+  }
+  core.info(`Found ${commits.length} commit(s) in push event`);
+
+  // Determine impact from commit messages only (no PR title in push context)
+  const commit_impacts: ParsedCommitInfo[] = [];
+  for (const commit of commits) {
+    const commit_impact = getConventionalImpact(commit);
+    core.debug(`Commit ${commit.sha} title: ${commit.title}`);
+    core.debug(`Determined impact from commit: ${commit_impact ?? 'none'}`);
+    if (commit_impact !== undefined) {
+      commit_impacts.push(commit_impact);
+    }
+  }
+
+  if (commit_impacts.length === 0) {
+    core.info(
+      'No conventional commit impacts found in push commits; skipping version bump.',
+    );
+    core.setOutput('release', false);
+    return;
+  }
+
+  const max_commit_impact = Math.max(
+    ...commit_impacts.map((c) => c.impact),
+  ) as Impact;
+  const final_impact = commit_impacts.find(
+    (c) => c.impact === max_commit_impact,
+  )!;
+  core.info(`Maximum impact from push commits: ${Impact[max_commit_impact]}`);
+
+  const bumped_base_version = last_release_version.bump(final_impact.impact);
+  const build_metadata = core.getInput('build-metadata');
+
+  const new_version = new SemanticVersion(
+    bumped_base_version.major,
+    bumped_base_version.minor,
+    bumped_base_version.patch,
+    undefined, // no prerelease on push
+    build_metadata,
+  );
+
+  core.info(
+    `Bumping version from ${last_release_version.toString()} to ${new_version.toString()}`,
+  );
+
+  const generated_release_notes = generateReleaseNotes(commits);
+  const release_notes = release_notes_format.replace(
+    '<INSERT_RELEASE_NOTES_HERE>',
+    generated_release_notes,
+  );
+  const filePath = './release-notes.md';
+  await writeFile(filePath, release_notes, 'utf8');
+  core.info(`Wrote release notes to ${filePath}`);
+
+  if (release_notes.length < 10000) {
+    core.setOutput('release-notes', release_notes);
+  } else {
+    core.error(
+      `Release notes length (${release_notes.length}) exceeds 10,000 characters, Refusing to populate output.
+      Consider using the 'release-notes-file' output for large release notes.`,
+    );
+  }
+
+  const impact = final_impact.impact;
+  core.setOutput('release', impact !== Impact.NOIMPACT);
+  core.setOutput('release-notes-file', filePath);
+  core.setOutput('prerelease', false);
+  core.setOutput('tag', new_version.as_tag());
+  core.setOutput('version', new_version.toString());
+  core.setOutput('version-pep-440', new_version.as_pep_440());
+
+  const impactRes: ImpactResult = {
+    prImpact: undefined,
+    commitImpacts: commit_impacts,
+    maxCommitImpact: max_commit_impact,
+    finalImpact: final_impact,
+  };
+
+  await write_job_summary(
+    impactRes,
+    impact,
+    last_release_version,
+    new_version,
+    release_notes,
+  );
+}
+
 export async function run() {
   try {
     const token =
@@ -359,7 +475,31 @@ export async function run() {
       return;
     }
 
-    await run_github(token, release_notes_format_input);
+    const eventName = gh.getEventName();
+    core.info(`Detected GitHub event: ${eventName}`);
+
+    if (eventName === 'push') {
+      await run_github_push(token, release_notes_format_input);
+    } else if (
+      eventName === 'pull_request' ||
+      eventName === 'pull_request_target'
+    ) {
+      await run_github_pr(token, release_notes_format_input);
+    } else {
+      // For unknown events, try PR context first, fall back to push
+      const pr = gh.getPrFromContext();
+      if (pr) {
+        core.info(
+          `Event '${eventName}' has PR context available; using pull request handler.`,
+        );
+        await run_github_pr(token, release_notes_format_input);
+      } else {
+        core.info(
+          `Event '${eventName}' has no PR context; falling back to push handler.`,
+        );
+        await run_github_push(token, release_notes_format_input);
+      }
+    }
   } catch (err) {
     core.setFailed(String(err));
   }

@@ -48,9 +48,11 @@ describe('getImpactFromGithub - concise scenarios', () => {
       getLatestTag: async () => undefined,
       getPrCommits: mockedGetPrCommits,
       getPrFromContext: () => undefined,
+      getEventName: () => 'pull_request',
       getReleaseCandidatesSinceLatestRelease: async () => [],
       getReleaseCandidates: async () => [],
       getFileContent: async () => undefined,
+      getPushCommits: async () => [],
     }));
 
     const mod = await import('../src/main.js');
@@ -93,10 +95,12 @@ describe('getImpactFromGithub - concise scenarios', () => {
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'not-a-version' }),
         getPrFromContext: () => undefined,
+        getEventName: () => 'pull_request',
         getPrCommits: async () => [],
         getReleaseCandidatesSinceLatestRelease: async () => [],
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
+        getPushCommits: async () => [],
       }));
       // mock core
       // @ts-ignore
@@ -133,10 +137,12 @@ describe('getImpactFromGithub - concise scenarios', () => {
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'v1.2.3' }),
         getPrFromContext: () => undefined,
+        getEventName: () => 'pull_request',
         getPrCommits: async () => [],
         getReleaseCandidatesSinceLatestRelease: async () => [],
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
+        getPushCommits: async () => [],
       }));
       // @ts-ignore
       await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
@@ -181,10 +187,12 @@ describe('getImpactFromGithub - concise scenarios', () => {
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'v1.2.3' }),
         getPrFromContext: () => pr,
+        getEventName: () => 'pull_request',
         getPrCommits: async () => [],
         getReleaseCandidatesSinceLatestRelease: async () => [],
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
+        getPushCommits: async () => [],
       }));
       // @ts-ignore
       await (jest as any).unstable_mockModule(
@@ -240,6 +248,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
       await (jest as any).unstable_mockModule('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'v1.0.0' }),
         getPrFromContext: () => pr,
+        getEventName: () => 'pull_request',
         getPrCommits: async () => [],
         getReleaseCandidatesSinceLatestRelease: async () => [
           { name: 'v1.0.1-rc.0' },
@@ -250,6 +259,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
           { name: 'v1.0.1-rc.1' },
         ],
         getFileContent: async () => undefined,
+        getPushCommits: async () => [],
       }));
 
       // mock conventional_commits to give a PATCH impact (1)
@@ -281,6 +291,251 @@ describe('getImpactFromGithub - concise scenarios', () => {
       const tags = ['v1.0.1-rc.0', 'v1.0.1-rc.1'];
       const next = SemanticVersion.nextRcIndex(base, tags);
       expect(next).toBe(2);
+    });
+
+    test('push event: happy path -> outputs tag and version from commits', async () => {
+      const coreMock = {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warning: jest.fn(),
+        error: jest.fn(),
+        setFailed: jest.fn(),
+        getInput: jest.fn(() => ''),
+        setOutput: jest.fn(),
+        summary: {
+          addHeading: jest.fn(() => ({
+            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          })),
+          write: jest.fn(),
+        },
+      } as any;
+
+      jest.resetModules();
+      process.env.GITHUB_TOKEN = 'tok';
+
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+        getLatestTag: async () => ({ name: 'v2.0.0' }),
+        getPrFromContext: () => undefined,
+        getEventName: () => 'push',
+        getPrCommits: async () => [],
+        getPushCommits: async () => [
+          { sha: 'abc123', title: 'feat: add new feature', body: undefined },
+          { sha: 'def456', title: 'fix: resolve bug', body: undefined },
+        ],
+        getReleaseCandidatesSinceLatestRelease: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
+      }));
+      // Reset conventional_commits mock so the real parser is used
+      // @ts-ignore
+      await (jest as any).unstable_mockModule(
+        '../src/conventional_commits.js',
+        () => ({
+          getConventionalImpact: (obj: any) => {
+            // Inline simplified conventional commit parser for test isolation
+            const re =
+              /^(?<type>\w+)(?:\([^)]+\))?(?<breaking>!)?:\s*(?<description>.*)$/;
+            const m = obj.title.match(re);
+            if (!m) return undefined;
+            const typeMap: Record<string, number> = {
+              feat: 2,
+              fix: 1,
+              chore: 0,
+              docs: 0,
+            };
+            const type = m.groups?.type;
+            if (!type || !(type in typeMap)) return undefined;
+            let impact = typeMap[type];
+            if (m.groups?.breaking) impact = 3;
+            return { type, impact };
+          },
+        }),
+      );
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+      const mod = await import('../src/main.js');
+      await mod.run();
+
+      // feat is MINOR, so bump from 2.0.0 -> 2.1.0
+      expect(coreMock.setOutput).toHaveBeenCalledWith('tag', 'v2.1.0');
+      expect(coreMock.setOutput).toHaveBeenCalledWith('version', '2.1.0');
+      expect(coreMock.setOutput).toHaveBeenCalledWith('release', true);
+      expect(coreMock.setOutput).toHaveBeenCalledWith('prerelease', false);
+      expect(coreMock.setFailed).not.toHaveBeenCalled();
+    });
+
+    test('push event: no conventional commits -> release false', async () => {
+      const coreMock = {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warning: jest.fn(),
+        error: jest.fn(),
+        setFailed: jest.fn(),
+        getInput: jest.fn(() => ''),
+        setOutput: jest.fn(),
+        summary: {
+          addHeading: jest.fn(() => ({
+            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          })),
+          write: jest.fn(),
+        },
+      } as any;
+
+      jest.resetModules();
+      process.env.GITHUB_TOKEN = 'tok';
+
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+        getLatestTag: async () => ({ name: 'v1.0.0' }),
+        getPrFromContext: () => undefined,
+        getEventName: () => 'push',
+        getPrCommits: async () => [],
+        getPushCommits: async () => [
+          {
+            sha: 'abc123',
+            title: 'update readme',
+            body: undefined,
+          },
+        ],
+        getReleaseCandidatesSinceLatestRelease: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
+      }));
+      // Mock conventional_commits to return undefined for non-conventional titles
+      // @ts-ignore
+      await (jest as any).unstable_mockModule(
+        '../src/conventional_commits.js',
+        () => ({
+          getConventionalImpact: () => undefined,
+        }),
+      );
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+      const mod = await import('../src/main.js');
+      await mod.run();
+
+      expect(coreMock.setOutput).toHaveBeenCalledWith('release', false);
+      expect(coreMock.setFailed).not.toHaveBeenCalled();
+    });
+
+    test('push event: no commits in push -> skips version bump', async () => {
+      const coreMock = {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warning: jest.fn(),
+        error: jest.fn(),
+        setFailed: jest.fn(),
+        getInput: jest.fn(() => ''),
+        setOutput: jest.fn(),
+        summary: {
+          addHeading: jest.fn(() => ({
+            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          })),
+          write: jest.fn(),
+        },
+      } as any;
+
+      jest.resetModules();
+      process.env.GITHUB_TOKEN = 'tok';
+
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+        getLatestTag: async () => ({ name: 'v1.0.0' }),
+        getPrFromContext: () => undefined,
+        getEventName: () => 'push',
+        getPrCommits: async () => [],
+        getPushCommits: async () => [],
+        getReleaseCandidatesSinceLatestRelease: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
+      }));
+      // Reset conventional_commits mock
+      // @ts-ignore
+      await (jest as any).unstable_mockModule(
+        '../src/conventional_commits.js',
+        () => ({
+          getConventionalImpact: () => undefined,
+        }),
+      );
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+      const mod = await import('../src/main.js');
+      await mod.run();
+
+      // Should not set any version outputs when there are no commits
+      expect(coreMock.setOutput).not.toHaveBeenCalledWith(
+        'tag',
+        expect.anything(),
+      );
+      expect(coreMock.setFailed).not.toHaveBeenCalled();
+    });
+
+    test('unknown event with no PR context falls back to push handler', async () => {
+      const coreMock = {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warning: jest.fn(),
+        error: jest.fn(),
+        setFailed: jest.fn(),
+        getInput: jest.fn(() => ''),
+        setOutput: jest.fn(),
+        summary: {
+          addHeading: jest.fn(() => ({
+            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          })),
+          write: jest.fn(),
+        },
+      } as any;
+
+      jest.resetModules();
+      process.env.GITHUB_TOKEN = 'tok';
+
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+        getLatestTag: async () => ({ name: 'v1.0.0' }),
+        getPrFromContext: () => undefined,
+        getEventName: () => 'workflow_dispatch',
+        getPrCommits: async () => [],
+        getPushCommits: async () => [
+          { sha: 'a1', title: 'fix: patch thing', body: undefined },
+        ],
+        getReleaseCandidatesSinceLatestRelease: async () => [],
+        getReleaseCandidates: async () => [],
+        getFileContent: async () => undefined,
+      }));
+      // @ts-ignore
+      await (jest as any).unstable_mockModule(
+        '../src/conventional_commits.js',
+        () => ({
+          getConventionalImpact: (obj: any) => {
+            const re =
+              /^(?<type>\w+)(?:\([^)]+\))?(?<breaking>!)?:\s*(?<description>.*)$/;
+            const m = obj.title.match(re);
+            if (!m) return undefined;
+            const typeMap: Record<string, number> = {
+              feat: 2,
+              fix: 1,
+              chore: 0,
+              docs: 0,
+            };
+            const type = m.groups?.type;
+            if (!type || !(type in typeMap)) return undefined;
+            let impact = typeMap[type];
+            if (m.groups?.breaking) impact = 3;
+            return { type, impact };
+          },
+        }),
+      );
+      // @ts-ignore
+      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+      const mod = await import('../src/main.js');
+      await mod.run();
+
+      // Should use push handler and produce a PATCH bump
+      expect(coreMock.setOutput).toHaveBeenCalledWith('tag', 'v1.0.1');
+      expect(coreMock.setOutput).toHaveBeenCalledWith('version', '1.0.1');
+      expect(coreMock.setFailed).not.toHaveBeenCalled();
     });
   });
 });

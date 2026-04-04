@@ -312,4 +312,74 @@ describe('github module', () => {
     expect(t!.author).toBe('Bob');
     expect(t!.content).toBe('commit message');
   });
+
+  test('getEventName returns the context event name', async () => {
+    const ghMock = {
+      context: {
+        repo: { owner: 'o', repo: 'r' },
+        payload: {},
+        eventName: 'push',
+      },
+      getOctokit: () => ({}),
+    };
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+    const mod = await import('../src/github.js');
+    expect(mod.getEventName()).toBe('push');
+  });
+
+  test('getPushCommits extracts commits from push payload', async () => {
+    const ghMock = {
+      context: {
+        repo: { owner: 'o', repo: 'r' },
+        payload: {
+          before: 'aaa',
+          after: 'bbb',
+          commits: [
+            { id: 'sha1', message: 'feat: add thing\n\nsome body text' },
+            { id: 'sha2', message: 'fix: patch bug' },
+          ],
+        },
+        eventName: 'push',
+      },
+      getOctokit: () => ({}),
+    };
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/core', () => ({
+      info: () => {},
+      debug: () => {},
+    }));
+    const mod = await import('../src/github.js');
+    const commits = await mod.getPushCommits('tok');
+    expect(commits).toHaveLength(2);
+    expect(commits[0].sha).toBe('sha1');
+    expect(commits[0].title).toBe('feat: add thing');
+    expect(commits[0].body).toBe('some body text');
+    expect(commits[1].sha).toBe('sha2');
+    expect(commits[1].title).toBe('fix: patch bug');
+    expect(commits[1].body).toBeUndefined();
+  });
+
+  test('getPushCommits returns empty array when no commits in payload and no before/after', async () => {
+    const ghMock = {
+      context: {
+        repo: { owner: 'o', repo: 'r' },
+        payload: {},
+        eventName: 'push',
+      },
+      getOctokit: () => ({}),
+    };
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+    // @ts-ignore
+    await (jest as any).unstable_mockModule('@actions/core', () => ({
+      info: () => {},
+      debug: () => {},
+    }));
+    const mod = await import('../src/github.js');
+    const commits = await mod.getPushCommits('tok');
+    expect(commits).toEqual([]);
+  });
 });

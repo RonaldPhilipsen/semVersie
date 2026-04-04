@@ -50,6 +50,76 @@ export function getPrFromContext(): PullRequest | undefined {
   return extractPullRequestFromPayload(ctx.payload as unknown);
 }
 
+/**
+ * Return the event name from the Actions context (e.g. "push", "pull_request").
+ */
+export function getEventName(): string {
+  return github.context.eventName;
+}
+
+/**
+ * Extract commits from a push event payload.
+ * The push payload contains a `commits` array with `id`, `message`, etc.
+ * Falls back to fetching commits between `before` and `after` SHAs via
+ * local git or the GitHub API compare endpoint.
+ */
+export async function getPushCommits(token: string): Promise<Commit[]> {
+  const ctx = github.context;
+  const payload = ctx.payload as {
+    before?: string;
+    after?: string;
+    commits?: Array<{ id: string; message: string }>;
+  };
+
+  // First try the commits array embedded in the push payload
+  if (payload.commits && payload.commits.length > 0) {
+    core.info(
+      `Found ${payload.commits.length} commit(s) in push payload directly`,
+    );
+    return payload.commits.map((c) => {
+      const lines = (c.message ?? '').split('\n');
+      const title = lines[0] ?? '';
+      const body = lines.slice(1).join('\n').trim() || undefined;
+      return { sha: c.id, title, body };
+    });
+  }
+
+  // Fall back to git log between before..after
+  const before = payload.before;
+  const after = payload.after;
+  if (before && after) {
+    core.debug(
+      `No commits in push payload; fetching from local git: ${before}..${after}`,
+    );
+    const localCommits = await git.getCommits(before, after);
+    if (localCommits.length > 0) {
+      return localCommits;
+    }
+
+    // Final fallback: GitHub compare API
+    if (token) {
+      core.debug(
+        `Local git returned no commits; using GitHub compare API: ${before}...${after}`,
+      );
+      try {
+        const { octokit, owner, repo } = getOctokitAndRepo(token);
+        const res = await octokit.rest.repos.compareCommits({
+          owner,
+          repo,
+          base: before,
+          head: after,
+        });
+        return (res.data.commits ?? []).map((c) => parseCommit(c));
+      } catch (err) {
+        core.debug(`GitHub compare API failed: ${String(err)}`);
+      }
+    }
+  }
+
+  core.debug('Could not extract any commits from push context');
+  return [];
+}
+
 function getOctokitAndRepo(token: string) {
   const octokit = github.getOctokit(token);
   const ctx = github.context;
