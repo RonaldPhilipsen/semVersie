@@ -17,6 +17,8 @@ concurrency:
     'release-${{ github.event.pull_request.merge_commit_sha || github.sha }}'
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   semVersie:
     name: semVersie
@@ -32,6 +34,8 @@ jobs:
       version-pep-440: ${{ steps.semVersie.outputs['version-pep-440'] }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - name: Install Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         timeout-minutes: 5
@@ -55,8 +59,15 @@ jobs:
     permissions:
       contents: write # to be able to push commits and create releases
     if: needs.semVersie.outputs.release == 'true'
+    env:
+      VERSION: ${{ needs.semVersie.outputs.version }}
+      TAG: ${{ needs.semVersie.outputs.tag }}
+      RELEASE_NOTES: ${{ needs.semVersie.outputs['release-notes'] }}
+      PRERELEASE: ${{ needs.semVersie.outputs.prerelease }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - name: Install Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
@@ -66,7 +77,7 @@ jobs:
           npm install
       - name: update version in package.json
         run: |
-          npm version ${{ needs.semVersie.outputs.version }} --no-git-tag-version
+          npm version "$VERSION" --no-git-tag-version
       - name: build distribution
         run: |
           npm run build
@@ -77,27 +88,27 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git
-          git switch -c release-${{ needs.semVersie.outputs.version }}
+          git switch -c "release-$VERSION"
           # temporarily unignore dist/ to commit built files
           git add --force dist/* package.json package-lock.json
           git status
-          git commit -m 'chore: bump version to ${{ needs.semVersie.outputs.version }}'
-          git push --set-upstream origin release-${{ needs.semVersie.outputs.version }}
+          git commit -m "chore: bump version to $VERSION"
+          git push --set-upstream origin "release-$VERSION"
       - name: Tag Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git tag ${{ needs.semVersie.outputs.tag }}
-          git push origin ${{ needs.semVersie.outputs.tag }}
+          git tag "$TAG"
+          git push origin "$TAG"
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ needs.semVersie.outputs.tag }} \
-            --title '${{ needs.semVersie.outputs.tag }}' \
-            --notes '${{ needs.semVersie.outputs.release-notes }}' \
-            $([[ '${{ needs.semVersie.outputs.prerelease }}' == 'true' ]] && echo '--prerelease' || echo '')
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "$RELEASE_NOTES" \
+            $( [[ "$PRERELEASE" == 'true' ]] && echo '--prerelease' || echo '' )
       - name: clean up branch
         if: always()
         run: |
-          git push origin --delete release-${{ needs.semVersie.outputs.version }}
+          git push origin --delete "release-$VERSION"
