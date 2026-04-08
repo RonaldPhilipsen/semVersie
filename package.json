@@ -23,7 +23,7 @@
   },
   "scripts": {
     "build": "ncc build src/index.ts -o dist -m",
-    "test": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 npx jest",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 npx jest",
     "format": "npx prettier --write .",
     "lint": "npx eslint ."
   },
@@ -36,6 +36,7 @@
   "devDependencies": {
     "@vercel/ncc": "0.38.4",
     "@eslint/compat": "2.0.4",
+    "cross-env": "^7.0.3",
     "@github/local-action": "7.0.1",
     "@jest/globals": "30.3.0",
     "@types/jest": "30.0.0",
@@ -53,6 +54,6 @@
     "prettier-eslint": "16.4.2",
     "ts-jest": "29.4.9",
     "ts-jest-resolver": "2.0.1",
-    "typescript": "5.9.3"
+    "typescript": "6.0.2"
   }
 }
