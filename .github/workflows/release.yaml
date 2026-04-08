@@ -1,21 +1,10 @@
 name: 'Release'
 
 on:
-  pull_request:
-    types:
-      - opened
-      - closed
-      - edited
-      - labeled
-      - unlabeled
-      - synchronize
+  push:
     branches:
       - main
 
-concurrency:
-  group:
-    'release-${{ github.event.pull_request.merge_commit_sha || github.sha }}'
-  cancel-in-progress: true
 
 permissions: {}
 
