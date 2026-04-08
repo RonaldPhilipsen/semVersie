@@ -29,6 +29,38 @@ jobs:
       - name: run tests
         run: npm test
 
+  semVersie:
+    name: semVersie
+    runs-on: semversie-runner
+    permissions:
+      contents: read
+    outputs:
+      release: ${{ steps.semVersie.outputs.release }}
+      release-notes: ${{ steps.semVersie.outputs.release-notes }}
+      prerelease: ${{ steps.semVersie.outputs.prerelease }}
+      tag: ${{ steps.semVersie.outputs.tag }}
+      version: ${{ steps.semVersie.outputs.version }}
+      version-pep-440: ${{ steps.semVersie.outputs['version-pep-440'] }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - name: Install Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        timeout-minutes: 5
+        with:
+          node-version: '24'
+      - name: setup dependencies
+        timeout-minutes: 5
+        run: npm install
+      - name: build distribution
+        run: npm run build
+      - id: semVersie
+        name: semVersie
+        uses: ./
+        with:
+          release-notes-format: 'docs/resources/release-format.md'
+
   formatting:
     name: Check code formatting
     runs-on: semversie-runner
