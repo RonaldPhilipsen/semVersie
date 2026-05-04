@@ -14,6 +14,11 @@ and understandable without limiting the useability to a few languages.
 
 ## Usage (GitHub Actions)
 
+The action supports two trigger approaches: `on: pull_request` and `on: push`.
+Use whichever fits your workflow.
+
+### Triggering on pull request
+
 Triggering the workflow is to be done `on: pull_request` with the following
 various recommended types:
 
@@ -79,6 +84,60 @@ jobs:
 ```
 
 Please note that running this action from a non-fixed version is _not_ supported
+
+### Triggering on push to main
+
+As an alternative to `on: pull_request`, you can trigger the action on every
+push to `main`. The action inspects merged PRs between the last tag and the
+current commit to determine the version bump.
+
+```yaml
+on:
+  push:
+    branches:
+      - main
+```
+
+Use the `release` output to gate your release job — the action only sets it to
+`true` when there are unreleased merged PRs with a version-bumping title:
+
+```yaml
+permissions: {}
+
+jobs:
+  version:
+    name: semVersie
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release: ${{ steps.semVersie.outputs.release }}
+      tag: ${{ steps.semVersie.outputs.tag }}
+      version: ${{ steps.semVersie.outputs.version }}
+      release-notes: ${{ steps.semVersie.outputs.release-notes }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Calculate version
+        id: semVersie
+        uses: RonaldPhilipsen/semVersie@vX.Y.Z
+
+  release:
+    name: Create Release
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: needs.version.outputs.release == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ needs.version.outputs.tag }}" \
+            --title "${{ needs.version.outputs.tag }}" \
+            --notes "${{ needs.version.outputs.release-notes }}"
+```
 
 ### Inputs
 
