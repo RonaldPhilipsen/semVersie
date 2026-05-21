@@ -68,8 +68,8 @@ permissions:
 ```yaml
 permissions:
   contents: write
-  pull-requests: write  # Required for adding the labels to the PR
-  issues: write  # Required for adding labels to the repository
+  pull-requests: write # Required for adding the labels to the PR
+  issues: write # Required for adding labels to the repository
 
 jobs:
   version:
@@ -78,6 +78,7 @@ jobs:
     steps:
       - name: Calculate version and label PR
         uses: RonaldPhilipsen/semVersie@vX.Y.Z
+        with:
           add-pr-label: true
           # Optional: Enable or disable the "semVersie:" prefix of the labels
           label-prefix: false
@@ -147,7 +148,7 @@ jobs:
 | `build-metadata`       | Build metadata to include in the semver                                                          | No       | ``                                                                                                                 |
 | `release-notes-format` | Format to fill in for the release notes generation                                               | No       | `<INSERT_RELEASE_NOTES_HERE>` key will be replaced with release notes, [example](docs/resources/release-format.md) |
 | `add-pr-label`         | Whether to add a label to the PR indicating the version impact                                   | No       | `false`                                                                                                            |
-| `label-prefix`         | Whether to add the "semVersie:" prefix to PR labels (e.g., "semVersie:minor" instead of "minor") | No       | `false`                                                                                                            |
+| `label-prefix`         | Whether to add the "semVersie:" prefix to PR labels (e.g., "semVersie:minor" instead of "minor") | No       | `true`                                                                                                             |
 
 > **Note:** The `github-token` input has a default value and typically doesn't
 > need to be specified. If not provided, the action will fall back to local git
@@ -169,7 +170,7 @@ jobs:
 
 The project uses Node.js for tests/build. Useful scripts (from `package.json`):
 
-- npm run build — build the distribution (ncc)
+- npm run build — build the distribution with tsdown
 - npm test — run tests
 - npm run lint — run ESLint
 

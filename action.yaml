@@ -55,4 +55,4 @@ outputs:
     description: The generated version number in PEP 440 format, e.g. 1.2.3rc1
 runs:
   using: node24
-  main: dist/index.js
+  main: dist/index.mjs

@@ -11,6 +11,7 @@
     "test",
     "eslint.config.mjs",
     "vitest.config.ts",
-    "vitest.setup.ts"
+    "vitest.setup.ts",
+    "tsdown.config.ts"
   ]
 }
