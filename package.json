@@ -38,23 +38,23 @@
   },
   "devDependencies": {
     "@eslint/compat": "2.1.0",
-    "@eslint/eslintrc": "^3.3.5",
-    "@eslint/js": "^10.0.1",
+    "@eslint/eslintrc": "3.3.5",
+    "@eslint/js": "10.0.1",
     "@github/local-action": "7.0.1",
     "@types/node": "25.8.0",
     "@typescript-eslint/eslint-plugin": "8.59.3",
     "@typescript-eslint/parser": "8.59.3",
-    "@vitest/coverage-v8": "^4.1.7",
-    "@vitest/eslint-plugin": "^1.6.17",
+    "@vitest/coverage-v8": "4.1.7",
+    "@vitest/eslint-plugin": "1.6.17",
     "eslint": "10.4.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-prettier": "5.5.5",
-    "globals": "^17.6.0",
+    "globals": "17.6.0",
     "prettier": "3.8.3",
     "prettier-eslint": "16.4.2",
     "publint": "0.3.21",
     "tsdown": "0.22.0",
     "typescript": "6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "4.1.7"
   }
 }
