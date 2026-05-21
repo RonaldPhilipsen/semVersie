@@ -1,14 +1,12 @@
 // Tests for getImpactFromGithub in src/main.ts (ESM-compatible mocking)
-import { jest } from '@jest/globals';
 // Per-file mock for @actions/github to avoid needing a shared setup file.
 const mockContext: any = {
   repo: { owner: 'o', repo: 'r' },
   ref: undefined,
   payload: {},
 };
-const mockGetOctokit = jest.fn();
-// @ts-ignore - provide ESM mock for this test file only
-await (jest as any).unstable_mockModule('@actions/github', () => ({
+const mockGetOctokit = vi.fn();
+vi.doMock('@actions/github', () => ({
   context: mockContext,
   getOctokit: (...args: any[]) => mockGetOctokit(...args),
 }));
@@ -16,35 +14,32 @@ import { SemanticVersion, Impact } from '../src/semver.js';
 
 describe('getImpactFromGithub - concise scenarios', () => {
   beforeEach(() => {
-    jest.resetModules();
-    jest.clearAllMocks();
+    vi.resetModules();
   });
 
   test('PR title impact can override higher commit impact and warns', async () => {
     const coreMock = {
-      info: jest.fn(),
-      debug: jest.fn(),
-      warning: jest.fn(),
-      error: jest.fn(),
-      setFailed: jest.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+      warning: vi.fn(),
+      error: vi.fn(),
+      setFailed: vi.fn(),
     };
-    const mockedGetConventionalImpact = jest
+    const mockedGetConventionalImpact = vi
       .fn()
       .mockImplementationOnce(() => ({ type: 'chore', impact: Impact.PATCH }))
       .mockImplementationOnce(() => ({ type: 'feat', impact: Impact.MAJOR }));
-    const mockedGetPrCommits = (jest.fn() as any).mockResolvedValue([
+    const mockedGetPrCommits = (vi.fn() as any).mockResolvedValue([
       { sha: 'x', title: 'feat!: break', body: undefined },
     ]);
 
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule(
-      '../src/conventional_commits.js',
-      () => ({ getConventionalImpact: mockedGetConventionalImpact }),
-    );
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('../src/github.js', () => ({
+    vi.doMock('@actions/core', () => coreMock);
+
+    vi.doMock('../src/conventional_commits.js', () => ({
+      getConventionalImpact: mockedGetConventionalImpact,
+    }));
+
+    vi.doMock('../src/github.js', () => ({
       getLatestTag: async () => undefined,
       getPrCommits: mockedGetPrCommits,
       getPrFromContext: () => undefined,
@@ -71,27 +66,27 @@ describe('getImpactFromGithub - concise scenarios', () => {
   describe('run() behavior', () => {
     test('unparsable latest release -> setFailed', async () => {
       const coreMock = {
-        info: jest.fn(),
-        debug: jest.fn(),
-        warning: jest.fn(),
-        error: jest.fn(),
-        setFailed: jest.fn(),
-        getInput: jest.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+        warning: vi.fn(),
+        error: vi.fn(),
+        setFailed: vi.fn(),
+        getInput: vi.fn(),
         summary: {
-          addHeading: jest.fn(() => ({
-            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          addHeading: vi.fn(() => ({
+            addTable: vi.fn(() => ({ addRaw: vi.fn(), write: vi.fn() })),
           })),
-          write: jest.fn(),
+          write: vi.fn(),
         },
       } as any;
 
-      jest.resetModules();
+      vi.resetModules();
       process.env.GITHUB_TOKEN = 'tok';
 
       // mock github.getLatestRelease to return unparsable name
       // mock github behavior via unstable_mockModule (module will be imported by main)
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+
+      vi.doMock('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'not-a-version' }),
         getPrFromContext: () => undefined,
         getPrFromContextOrLatestCommit: () => undefined,
@@ -101,8 +96,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getFileContent: async () => undefined,
       }));
       // mock core
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+
+      vi.doMock('@actions/core', () => coreMock);
       const mod = await import('../src/main.js');
       await mod.run();
       expect(coreMock.setFailed).toHaveBeenCalledWith(
@@ -112,27 +107,27 @@ describe('getImpactFromGithub - concise scenarios', () => {
 
     test('parsed release but no PR in context -> setFailed', async () => {
       const coreMock = {
-        info: jest.fn(),
-        debug: jest.fn(),
-        warning: jest.fn(),
-        error: jest.fn(),
-        setFailed: jest.fn(),
-        getInput: jest.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+        warning: vi.fn(),
+        error: vi.fn(),
+        setFailed: vi.fn(),
+        getInput: vi.fn(),
         summary: {
-          addHeading: jest.fn(() => ({
-            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          addHeading: vi.fn(() => ({
+            addTable: vi.fn(() => ({ addRaw: vi.fn(), write: vi.fn() })),
           })),
-          write: jest.fn(),
+          write: vi.fn(),
         },
       } as any;
 
-      jest.resetModules();
+      vi.resetModules();
       process.env.GITHUB_TOKEN = 'tok';
 
       // mock github: latest release parsed, but PR missing
       // mock github and patch core
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+
+      vi.doMock('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'v1.2.3' }),
         getPrFromContext: () => undefined,
         getPrFromContextOrLatestCommit: () => undefined,
@@ -141,8 +136,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
       }));
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+
+      vi.doMock('@actions/core', () => coreMock);
       const mod = await import('../src/main.js');
       await mod.run();
       expect(coreMock.setFailed).toHaveBeenCalledWith(
@@ -152,23 +147,23 @@ describe('getImpactFromGithub - concise scenarios', () => {
 
     test('happy path -> outputs tag and version', async () => {
       const coreMock = {
-        info: jest.fn(),
-        debug: jest.fn(),
-        warning: jest.fn(),
-        error: jest.fn(),
-        setFailed: jest.fn(),
-        getInput: jest.fn(() => ''),
-        getBooleanInput: jest.fn(() => false),
-        setOutput: jest.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+        warning: vi.fn(),
+        error: vi.fn(),
+        setFailed: vi.fn(),
+        getInput: vi.fn(() => ''),
+        getBooleanInput: vi.fn(() => false),
+        setOutput: vi.fn(),
         summary: {
-          addHeading: jest.fn(() => ({
-            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          addHeading: vi.fn(() => ({
+            addTable: vi.fn(() => ({ addRaw: vi.fn(), write: vi.fn() })),
           })),
-          write: jest.fn(),
+          write: vi.fn(),
         },
       } as any;
 
-      jest.resetModules();
+      vi.resetModules();
       process.env.GITHUB_TOKEN = 'tok';
 
       const pr = {
@@ -181,8 +176,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
 
       // mock github and conventional_commits
       // mock github and conventional_commits and patch core
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+
+      vi.doMock('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'v1.2.3' }),
         getPrFromContext: () => pr,
         getPrFromContextOrLatestCommit: () => pr,
@@ -193,15 +188,12 @@ describe('getImpactFromGithub - concise scenarios', () => {
         ensureImpactLabels: async () => {},
         addImpactLabelToPr: async () => {},
       }));
-      // @ts-ignore
-      await (jest as any).unstable_mockModule(
-        '../src/conventional_commits.js',
-        () => ({
-          getConventionalImpact: () => ({ type: 'fix', impact: Impact.PATCH }),
-        }),
-      );
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+
+      vi.doMock('../src/conventional_commits.js', () => ({
+        getConventionalImpact: () => ({ type: 'fix', impact: Impact.PATCH }),
+      }));
+
+      vi.doMock('@actions/core', () => coreMock);
       const mod = await import('../src/main.js');
       await mod.run();
 
@@ -216,23 +208,23 @@ describe('getImpactFromGithub - concise scenarios', () => {
 
     test('pr with release-candidate label sets prerelease and outputs rc index', async () => {
       const coreMock = {
-        info: jest.fn(),
-        debug: jest.fn(),
-        warning: jest.fn(),
-        error: jest.fn(),
-        setFailed: jest.fn(),
-        getInput: jest.fn(() => ''),
-        getBooleanInput: jest.fn(() => false),
-        setOutput: jest.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+        warning: vi.fn(),
+        error: vi.fn(),
+        setFailed: vi.fn(),
+        getInput: vi.fn(() => ''),
+        getBooleanInput: vi.fn(() => false),
+        setOutput: vi.fn(),
         summary: {
-          addHeading: jest.fn(() => ({
-            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          addHeading: vi.fn(() => ({
+            addTable: vi.fn(() => ({ addRaw: vi.fn(), write: vi.fn() })),
           })),
-          write: jest.fn(),
+          write: vi.fn(),
         },
       } as any;
 
-      jest.resetModules();
+      vi.resetModules();
       process.env.GITHUB_TOKEN = 'tok';
 
       const pr = {
@@ -244,8 +236,8 @@ describe('getImpactFromGithub - concise scenarios', () => {
       };
 
       // mock github to provide baseline v1.0.0 and existing rc tags for 1.0.1
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+
+      vi.doMock('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'v1.0.0' }),
         getPrFromContext: () => pr,
         getPrFromContextOrLatestCommit: () => pr,
@@ -264,16 +256,12 @@ describe('getImpactFromGithub - concise scenarios', () => {
       }));
 
       // mock conventional_commits to give a PATCH impact (1)
-      // @ts-ignore
-      await (jest as any).unstable_mockModule(
-        '../src/conventional_commits.js',
-        () => ({
-          getConventionalImpact: () => ({ type: 'fix', impact: Impact.PATCH }),
-        }),
-      );
 
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+      vi.doMock('../src/conventional_commits.js', () => ({
+        getConventionalImpact: () => ({ type: 'fix', impact: Impact.PATCH }),
+      }));
+
+      vi.doMock('@actions/core', () => coreMock);
 
       const mod = await import('../src/main.js');
 
@@ -295,31 +283,31 @@ describe('getImpactFromGithub - concise scenarios', () => {
     });
 
     test('add-pr-label enabled calls ensureImpactLabels and addImpactLabelToPr', async () => {
-      const ensureLabelsCalled = jest.fn();
-      const addLabelCalled = jest.fn();
+      const ensureLabelsCalled = vi.fn();
+      const addLabelCalled = vi.fn();
 
       const coreMock = {
-        info: jest.fn(),
-        debug: jest.fn(),
-        warning: jest.fn(),
-        error: jest.fn(),
-        setFailed: jest.fn(),
-        getInput: jest.fn(() => ''),
-        getBooleanInput: jest.fn((name: string) => {
+        info: vi.fn(),
+        debug: vi.fn(),
+        warning: vi.fn(),
+        error: vi.fn(),
+        setFailed: vi.fn(),
+        getInput: vi.fn(() => ''),
+        getBooleanInput: vi.fn((name: string) => {
           if (name === 'add-pr-label') return true;
           if (name === 'label-prefix') return true;
           return false;
         }),
-        setOutput: jest.fn(),
+        setOutput: vi.fn(),
         summary: {
-          addHeading: jest.fn(() => ({
-            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          addHeading: vi.fn(() => ({
+            addTable: vi.fn(() => ({ addRaw: vi.fn(), write: vi.fn() })),
           })),
-          write: jest.fn(),
+          write: vi.fn(),
         },
       } as any;
 
-      jest.resetModules();
+      vi.resetModules();
       process.env.GITHUB_TOKEN = 'tok';
 
       const pr = {
@@ -330,8 +318,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
         labels: [],
       };
 
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+      vi.doMock('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'v1.0.0' }),
         getPrFromContext: () => pr,
         getPrFromContextOrLatestCommit: () => pr,
@@ -341,15 +328,12 @@ describe('getImpactFromGithub - concise scenarios', () => {
         ensureImpactLabels: ensureLabelsCalled,
         addImpactLabelToPr: addLabelCalled,
       }));
-      // @ts-ignore
-      await (jest as any).unstable_mockModule(
-        '../src/conventional_commits.js',
-        () => ({
-          getConventionalImpact: () => ({ type: 'feat', impact: Impact.MINOR }),
-        }),
-      );
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+
+      vi.doMock('../src/conventional_commits.js', () => ({
+        getConventionalImpact: () => ({ type: 'feat', impact: Impact.MINOR }),
+      }));
+
+      vi.doMock('@actions/core', () => coreMock);
       const mod = await import('../src/main.js');
       await mod.run();
 
@@ -364,30 +348,30 @@ describe('getImpactFromGithub - concise scenarios', () => {
     });
 
     test('add-pr-label with NOIMPACT adds no-impact label', async () => {
-      const ensureLabelsCalled = jest.fn();
-      const addLabelCalled = jest.fn();
+      const ensureLabelsCalled = vi.fn();
+      const addLabelCalled = vi.fn();
 
       const coreMock = {
-        info: jest.fn(),
-        debug: jest.fn(),
-        warning: jest.fn(),
-        error: jest.fn(),
-        setFailed: jest.fn(),
-        getInput: jest.fn(() => ''),
-        getBooleanInput: jest.fn((name: string) => {
+        info: vi.fn(),
+        debug: vi.fn(),
+        warning: vi.fn(),
+        error: vi.fn(),
+        setFailed: vi.fn(),
+        getInput: vi.fn(() => ''),
+        getBooleanInput: vi.fn((name: string) => {
           if (name === 'add-pr-label') return true;
           return false;
         }),
-        setOutput: jest.fn(),
+        setOutput: vi.fn(),
         summary: {
-          addHeading: jest.fn(() => ({
-            addTable: jest.fn(() => ({ addRaw: jest.fn(), write: jest.fn() })),
+          addHeading: vi.fn(() => ({
+            addTable: vi.fn(() => ({ addRaw: vi.fn(), write: vi.fn() })),
           })),
-          write: jest.fn(),
+          write: vi.fn(),
         },
       } as any;
 
-      jest.resetModules();
+      vi.resetModules();
       process.env.GITHUB_TOKEN = 'tok';
 
       const pr = {
@@ -398,8 +382,7 @@ describe('getImpactFromGithub - concise scenarios', () => {
         labels: [],
       };
 
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('../src/github.js', () => ({
+      vi.doMock('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'v1.0.0' }),
         getPrFromContext: () => pr,
         getPrFromContextOrLatestCommit: () => pr,
@@ -409,18 +392,15 @@ describe('getImpactFromGithub - concise scenarios', () => {
         ensureImpactLabels: ensureLabelsCalled,
         addImpactLabelToPr: addLabelCalled,
       }));
-      // @ts-ignore
-      await (jest as any).unstable_mockModule(
-        '../src/conventional_commits.js',
-        () => ({
-          getConventionalImpact: () => ({
-            type: 'docs',
-            impact: Impact.NOIMPACT,
-          }),
+
+      vi.doMock('../src/conventional_commits.js', () => ({
+        getConventionalImpact: () => ({
+          type: 'docs',
+          impact: Impact.NOIMPACT,
         }),
-      );
-      // @ts-ignore
-      await (jest as any).unstable_mockModule('@actions/core', () => coreMock);
+      }));
+
+      vi.doMock('@actions/core', () => coreMock);
       const mod = await import('../src/main.js');
       await mod.run();
 

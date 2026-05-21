@@ -1,11 +1,8 @@
-import { jest } from '@jest/globals';
-
 // Consolidated GitHub-related tests (cache, edge cases, and helpers)
 
 describe('github module', () => {
   beforeEach(() => {
-    jest.resetModules();
-    jest.clearAllMocks();
+    vi.resetModules();
     process.env.GITHUB_TOKEN = 'tok';
   });
 
@@ -13,30 +10,30 @@ describe('github module', () => {
 
   test('context helpers parse PR payload shapes', async () => {
     // reuse the original github.test setup style
-    const mockGetOctokit = jest.fn();
+    const mockGetOctokit = vi.fn();
     const mockContext: any = {
       repo: { owner: 'octocat', repo: 'hello-world' },
       ref: undefined,
       payload: {},
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ({
+
+    vi.doMock('@actions/github', () => ({
       context: mockContext,
       getOctokit: (...args: any[]) => mockGetOctokit(...args),
     }));
 
     mockContext.payload = { pull_request: { number: 5, title: 'x' } };
-    jest.resetModules();
+    vi.resetModules();
     const mod = await import('../src/github.js');
     expect(mod.getPrFromContext()!.number).toBe(5);
 
     mockContext.payload = { event: { pull_request: { number: 7 } } };
-    jest.resetModules();
+    vi.resetModules();
     const mod2 = await import('../src/github.js');
     expect(mod2.getPrFromContext()!.number).toBe(7);
 
     mockContext.payload = { event: { pull_request: { title: 'T' } } };
-    jest.resetModules();
+    vi.resetModules();
     const mod3 = await import('../src/github.js');
     expect(mod3.getPrTitleFromContext()).toBe('T');
   });
@@ -71,8 +68,7 @@ describe('github module', () => {
       }),
     };
 
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+    vi.doMock('@actions/github', () => ghMock);
     const mod = await import('../src/github.js');
     const result = await mod.getPrFromContextOrLatestCommit('tok');
     expect(result).toBeDefined();
@@ -98,8 +94,8 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/github', () => ghMock);
     const mod = await import('../src/github.js');
     const p1 = mod.getLatestTag('tok');
     const p2 = mod.getLatestTag('tok');
@@ -145,10 +141,9 @@ describe('github module', () => {
       getOctokit: () => octokit,
     };
 
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
       info: () => {},
       debug: () => {},
     }));
@@ -182,10 +177,10 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
       debug: () => {},
     }));
     const mod = await import('../src/github.js');
@@ -198,10 +193,10 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {}, ref: undefined },
       getOctokit: () => ({}),
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
       debug: () => {},
     }));
     const mod = await import('../src/github.js');
@@ -229,10 +224,10 @@ describe('github module', () => {
       },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
       debug: () => {},
       info: () => {},
     }));
@@ -272,10 +267,10 @@ describe('github module', () => {
       },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
       debug: () => {},
       info: () => {},
     }));
@@ -298,10 +293,10 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
       debug: () => {},
     }));
     const mod = await import('../src/github.js');
@@ -318,8 +313,8 @@ describe('github module', () => {
       },
       getOctokit: () => ({}),
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/github', () => ghMock);
     const mod = await import('../src/github.js');
     const title = mod.getPrTitleFromContext();
     expect(title).toBe('abc');
@@ -347,8 +342,8 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/github', () => ghMock);
     const mod = await import('../src/github.js');
     const t = await mod.getLatestAnnotatedTag('tok', 'v1.2.3');
     expect(t).toBeDefined();
@@ -382,8 +377,8 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/github', () => ghMock);
     const mod = await import('../src/github.js');
     const t = await mod.getLatestLightweightTag('tok', 'v1.2.3');
     expect(t).toBeDefined();
@@ -412,13 +407,13 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
-      info: jest.fn(),
-      debug: jest.fn(),
-      warning: jest.fn(),
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
+      info: vi.fn(),
+      debug: vi.fn(),
+      warning: vi.fn(),
     }));
     const mod = await import('../src/github.js');
 
@@ -449,13 +444,13 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
-      info: jest.fn(),
-      debug: jest.fn(),
-      warning: jest.fn(),
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
+      info: vi.fn(),
+      debug: vi.fn(),
+      warning: vi.fn(),
     }));
     const mod = await import('../src/github.js');
 
@@ -486,13 +481,13 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
-      info: jest.fn(),
-      debug: jest.fn(),
-      warning: jest.fn(),
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
+      info: vi.fn(),
+      debug: vi.fn(),
+      warning: vi.fn(),
     }));
     const mod = await import('../src/github.js');
 
@@ -528,12 +523,12 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
-      info: jest.fn(),
-      warning: jest.fn(),
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
+      info: vi.fn(),
+      warning: vi.fn(),
     }));
     const mod = await import('../src/github.js');
 
@@ -563,12 +558,12 @@ describe('github module', () => {
       context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
       getOctokit: () => octokit,
     };
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/github', () => ghMock);
-    // @ts-ignore
-    await (jest as any).unstable_mockModule('@actions/core', () => ({
-      info: jest.fn(),
-      warning: jest.fn(),
+
+    vi.doMock('@actions/github', () => ghMock);
+
+    vi.doMock('@actions/core', () => ({
+      info: vi.fn(),
+      warning: vi.fn(),
     }));
     const mod = await import('../src/github.js');
 

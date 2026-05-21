@@ -1,12 +1,10 @@
 // See: https://eslint.org/docs/latest/use/configure/configuration-files
 
-import { fixupPluginRules } from '@eslint/compat';
 import { FlatCompat } from '@eslint/eslintrc';
 import js from '@eslint/js';
 import typescriptEslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
-import _import from 'eslint-plugin-import';
-import jest from 'eslint-plugin-jest';
+import vitest from '@vitest/eslint-plugin';
 import prettier from 'eslint-plugin-prettier';
 import globals from 'globals';
 import path from 'node:path';
@@ -28,13 +26,11 @@ export default [
     'eslint:recommended',
     'plugin:@typescript-eslint/eslint-recommended',
     'plugin:@typescript-eslint/recommended',
-    'plugin:jest/recommended',
     'plugin:prettier/recommended',
   ),
   {
     plugins: {
-      import: fixupPluginRules(_import),
-      jest,
+      vitest,
       prettier,
       '@typescript-eslint': typescriptEslint,
     },
@@ -42,7 +38,7 @@ export default [
     languageOptions: {
       globals: {
         ...globals.node,
-        ...globals.jest,
+        ...vitest.environments.env.globals,
         Atomics: 'readonly',
         SharedArrayBuffer: 'readonly',
       },
@@ -53,15 +49,6 @@ export default [
       // load a tsconfig for JS files (for example eslint.config.js).
       ecmaVersion: 2023,
       sourceType: 'module',
-    },
-
-    settings: {
-      'import/resolver': {
-        typescript: {
-          alwaysTryTypes: true,
-          project: 'tsconfig.eslint.json',
-        },
-      },
     },
 
     rules: {
@@ -105,7 +92,7 @@ export default [
     files: ['test/**/*.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      'jest/no-conditional-expect': 'off',
+      'vitest/no-conditional-expect': 'off',
       '@typescript-eslint/ban-ts-comment': 'off',
     },
   },

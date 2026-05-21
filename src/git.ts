@@ -14,29 +14,12 @@ export type Tag = {
 };
 
 /**
- * Check if we're in a test environment
- */
-function isTestEnvironment(): boolean {
-  return (
-    process.env.NODE_ENV === 'test' ||
-    process.env.JEST_WORKER_ID !== undefined ||
-    typeof (globalThis as { jest?: unknown }).jest !== 'undefined'
-  );
-}
-
-/**
  * Execute a git command and return the output
  */
 export async function execGitCommand(
   args: string[],
 ): Promise<string | undefined> {
   try {
-    // Skip git commands in test environment to avoid interfering with mocks
-    if (isTestEnvironment()) {
-      core.debug('Skipping git command in test environment');
-      return undefined;
-    }
-
     return new Promise((resolve, reject) => {
       const git = spawn('git', args, { cwd: process.cwd() });
       let stdout = '';
