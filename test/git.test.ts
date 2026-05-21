@@ -1,36 +1,16 @@
-import { jest } from '@jest/globals';
-
-jest.mock('../src/utils', () => ({
-  filterRCTagsByBaseline: jest.fn(() => [{ name: 'v1.0.0-rc1' }]),
+vi.mock('../src/utils', () => ({
+  filterRCTagsByBaseline: vi.fn(() => [{ name: 'v1.0.0-rc1' }]),
 }));
 
 import { parseCommitsOutput, parseTagsOutput } from '../src/git.js';
 
 describe('git module', () => {
-  const origNodeEnv = process.env.NODE_ENV;
-  const origJestWorkerId = process.env.JEST_WORKER_ID;
-
   beforeEach(() => {
-    // Allow git commands to run by clearing test environment markers
-    delete process.env.NODE_ENV;
-    delete process.env.JEST_WORKER_ID;
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   afterEach(() => {
-    // restore env
-    if (origNodeEnv !== undefined) {
-      process.env.NODE_ENV = origNodeEnv;
-    } else {
-      delete process.env.NODE_ENV;
-    }
-
-    if (origJestWorkerId !== undefined) {
-      process.env.JEST_WORKER_ID = origJestWorkerId;
-    } else {
-      delete process.env.JEST_WORKER_ID;
-    }
-    jest.resetAllMocks();
+    vi.resetAllMocks();
   });
 
   test('parseCommitsOutput parses git log output correctly', () => {
