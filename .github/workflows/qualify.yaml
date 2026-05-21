@@ -27,7 +27,7 @@ jobs:
           node-version: '24'
       - name: setup dependencies
         timeout-minutes: 5
-        run: npm install
+        run: npm ci
       - name: run tests
         run: npm test
 
@@ -54,7 +54,7 @@ jobs:
           node-version: '24'
       - name: setup dependencies
         timeout-minutes: 5
-        run: npm install
+        run: npm ci
       - name: build distribution
         run: npm run build
       - id: semVersie
@@ -76,19 +76,8 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '24'
-      - name: setup dependencies
-        timeout-minutes: 5
-        run: npm install
       - name: check formatting
-        run: npm run format
-      - name: verify no formatting changes
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            echo "Code is not properly formatted. Please run 'npm run format' and commit the changes.";
-            exit 1;
-          else
-            echo "Code is properly formatted.";
-          fi
+        run: npx prettier --check .
 
   zizmor:
     runs-on: ubuntu-latest
