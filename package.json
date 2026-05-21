@@ -1,5 +1,5 @@
 {
-  "name": "semVersie",
+  "name": "semversie",
   "version": "0.0.1",
   "description": "Simple semantic versioning",
   "type": "module",
@@ -15,14 +15,17 @@
   "keywords": [
     "actions"
   ],
+  "files": [
+    "dist"
+  ],
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.mjs"
   },
   "engines": {
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "ncc build src/index.ts -o dist -m",
+    "build": "tsdown",
     "test": "vitest run --coverage",
     "format": "npx prettier --write .",
     "lint": "npx eslint ."
@@ -41,7 +44,6 @@
     "@types/node": "25.8.0",
     "@typescript-eslint/eslint-plugin": "8.59.3",
     "@typescript-eslint/parser": "8.59.3",
-    "@vercel/ncc": "0.38.4",
     "@vitest/coverage-v8": "^4.1.7",
     "@vitest/eslint-plugin": "^1.6.17",
     "eslint": "10.4.0",
@@ -50,6 +52,8 @@
     "globals": "^17.6.0",
     "prettier": "3.8.3",
     "prettier-eslint": "16.4.2",
+    "publint": "0.3.21",
+    "tsdown": "0.22.0",
     "typescript": "6.0.3",
     "vitest": "^4.1.7"
   }
