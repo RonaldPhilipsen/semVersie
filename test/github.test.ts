@@ -4,6 +4,7 @@ describe('github module', () => {
   beforeEach(() => {
     vi.resetModules();
     process.env.GITHUB_TOKEN = 'tok';
+    delete process.env.GITHUB_SHA;
   });
 
   // Basic shared mocks for @actions/core are provided in individual tests where needed.
