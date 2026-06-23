@@ -4,6 +4,7 @@ describe('github module', () => {
   beforeEach(() => {
     vi.resetModules();
     process.env.GITHUB_TOKEN = 'tok';
+    delete process.env.GITHUB_SHA;
   });
 
   // Basic shared mocks for @actions/core are provided in individual tests where needed.
@@ -255,6 +256,7 @@ describe('github module', () => {
           listPullRequestsAssociatedWithCommit: async () => ({ data: [pr] }),
         },
         pulls: {
+          get: async () => ({ data: pr }),
           listCommits: async () => ({ data: [] }),
         },
       },
@@ -569,5 +571,63 @@ describe('github module', () => {
 
     await mod.addImpactLabelToPr('tok', 456, 'major', 'semVersie:');
     expect(addedLabel).toBe('semVersie:major');
+  });
+
+  test('getPrFromContextOrLatestCommit retries when association index is empty initially', async () => {
+    vi.useFakeTimers();
+
+    const pr = {
+      number: 99,
+      title: 'Retry PR',
+      body: '',
+      head: { ref: 'feat', sha: 'deadbeef', repo: { full_name: 'o/r' } },
+      base: { ref: 'main', sha: 'base000' },
+      labels: [],
+      draft: false,
+      merged: false,
+      merge_commit_sha: null,
+    };
+
+    let callCount = 0;
+    const ghMock = {
+      context: {
+        repo: { owner: 'o', repo: 'r' },
+        payload: {},
+        sha: 'deadbeef',
+      },
+      getOctokit: () => ({
+        rest: {
+          repos: {
+            listPullRequestsAssociatedWithCommit: async () => {
+              callCount++;
+              // Return empty on first two calls, then the PR
+              return { data: callCount < 3 ? [] : [pr] };
+            },
+          },
+          pulls: {
+            get: async () => ({ data: pr }),
+          },
+        },
+      }),
+    };
+
+    vi.doMock('@actions/github', () => ghMock);
+    vi.doMock('@actions/core', () => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+    }));
+
+    const mod = await import('../src/github.js');
+
+    const resultPromise = mod.getPrFromContextOrLatestCommit('tok');
+    // Advance through the first two retry delays (5s + 10s)
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    vi.useRealTimers();
+
+    expect(result).toBeDefined();
+    expect(result!.number).toBe(99);
+    expect(callCount).toBe(3);
   });
 });

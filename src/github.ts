@@ -29,6 +29,47 @@ export function getPrFromContext(): PullRequest | undefined {
   return extractPullRequestFromPayload(ctx.payload as unknown);
 }
 
+/**
+ * Attempt a single lookup of the pull request associated with a commit SHA.
+ * Returns undefined when the association index returns no results or on error.
+ */
+async function fetchPrForCommit(
+  token: string,
+  commitSha: string,
+): Promise<PullRequest | undefined> {
+  try {
+    const { octokit, owner, repo } = getOctokitAndRepo(token);
+    const response =
+      await octokit.rest.repos.listPullRequestsAssociatedWithCommit({
+        owner,
+        repo,
+        commit_sha: commitSha,
+      });
+    if (!Array.isArray(response.data) || response.data.length === 0)
+      return undefined;
+
+    const sourcePr = response.data[0] as PullRequestFromCommit;
+    const prResponse = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: sourcePr.number,
+    });
+    const pr = prResponse.data as PullRequest;
+    core.info(`Resolved PR #${pr.number} from latest commit ${commitSha}`);
+    return pr;
+  } catch (err) {
+    core.debug(
+      `fetchPrForCommit failed for commit ${commitSha}: ${String(err)}`,
+    );
+    return undefined;
+  }
+}
+
+/**
+ * Resolve the pull request associated with the latest commit in the Actions
+ * context. Retries with exponential backoff to handle GitHub's eventual
+ * consistency after a squash merge.
+ */
 async function getPrFromLatestCommit(
   token: string,
 ): Promise<PullRequest | undefined> {
@@ -40,35 +81,24 @@ async function getPrFromLatestCommit(
     return undefined;
   }
 
-  try {
-    const { octokit, owner, repo } = getOctokitAndRepo(token);
-    const response =
-      await octokit.rest.repos.listPullRequestsAssociatedWithCommit({
-        owner,
-        repo,
-        commit_sha: commitSha,
-      });
-    if (!Array.isArray(response.data) || response.data.length === 0) {
-      core.debug(`No PRs associated with commit ${commitSha}`);
-      return undefined;
-    }
+  // GitHub's association index can lag after e.g. a squash merge — retry with
+  // exponential backoff to handle eventual consistency.
+  const retryDelaysMs = [5_000, 10_000, 20_000];
 
-    const sourcePr = response.data[0] as PullRequestFromCommit;
-    const prResponse = await octokit.rest.pulls.get({
-      owner,
-      repo,
-      pull_number: sourcePr.number,
-    });
-    const pr = prResponse.data as PullRequest;
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    const pr = await fetchPrForCommit(token, commitSha);
+    if (pr) return pr;
 
-    core.info(`Resolved PR #${pr.number} from latest commit ${commitSha}`);
-    return pr;
-  } catch (err) {
-    core.debug(
-      `getPrFromLatestCommit failed for commit ${commitSha}: ${String(err)}`,
+    const delayMs = retryDelaysMs[attempt];
+    if (delayMs === undefined) break;
+    core.info(
+      `No PRs associated with commit ${commitSha} yet (attempt ${attempt + 1}/${retryDelaysMs.length + 1}), retrying in ${delayMs / 1000}s…`,
     );
-    return undefined;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
+
+  core.debug(`No PRs associated with commit ${commitSha} after all retries`);
+  return undefined;
 }
 
 /**
