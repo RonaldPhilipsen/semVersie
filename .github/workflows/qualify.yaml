@@ -57,6 +57,8 @@ jobs:
         run: npm ci
       - name: build distribution
         run: npm run build
+      - name: remove node_modules
+        run: rm -rf node_modules
       - id: semVersie
         name: semVersie
         uses: ./
