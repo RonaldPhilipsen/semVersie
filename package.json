@@ -1,6 +1,6 @@
 {
   "name": "semversie",
-  "version": "0.0.1",
+  "version": "2.3.4",
   "description": "Simple semantic versioning",
   "type": "module",
   "private": true,
