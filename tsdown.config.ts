@@ -6,4 +6,5 @@ export default defineConfig({
   minify: true,
   sourcemap: true,
   publint: true,
+  deps: { alwaysBundle: ['@actions/core', '@actions/github'] },
 });
