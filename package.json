@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@eslint/compat": "2.1.0",
-    "@eslint/eslintrc": "3.3.5",
+    "@eslint/eslintrc": "3.3.6",
     "@eslint/js": "10.0.1",
     "@github/local-action": "7.0.1",
     "@types/node": "25.9.5",
