@@ -52,7 +52,7 @@
     "globals": "17.9.0",
     "prettier": "3.9.6",
     "prettier-eslint": "17.1.1",
-    "publint": "0.3.22",
+    "publint": "0.3.23",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
