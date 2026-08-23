@@ -51,7 +51,7 @@
     "eslint-plugin-prettier": "5.5.6",
     "globals": "17.11.0",
     "prettier": "3.9.6",
-    "prettier-eslint": "17.1.1",
+    "prettier-eslint": "17.1.2",
     "publint": "0.3.24",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
