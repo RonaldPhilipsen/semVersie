@@ -27,7 +27,9 @@ jobs:
           node-version: '24'
       - name: setup dependencies
         timeout-minutes: 5
-        run: npm ci
+        run: |
+          mkdir -p ~/.npm
+          npm ci
       - name: run tests
         run: npm test
 
@@ -54,7 +56,9 @@ jobs:
           node-version: '24'
       - name: setup dependencies
         timeout-minutes: 5
-        run: npm ci
+        run: |
+          mkdir -p ~/.npm
+          npm ci
       - name: build distribution
         run: npm run build
       - name: remove node_modules
@@ -79,7 +83,9 @@ jobs:
         with:
           node-version: '24'
       - name: check formatting
-        run: npx prettier --check .
+        run: |
+          mkdir -p ~/.npm
+          npx prettier --check .
 
   zizmor:
     runs-on: ubuntu-latest
