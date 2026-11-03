@@ -85,6 +85,52 @@ export async function getImpactFromGithub(
   };
 }
 
+/**
+ * Determine impact from commit subjects only (no PR title override).
+ * Used for direct pushes where no PR is associated with the commit.
+ */
+export async function getImpactFromCommits(
+  commits: Commit[],
+): Promise<ImpactResult> {
+  const commit_impacts: ParsedCommitInfo[] = [];
+  for (const commit of commits) {
+    const commit_impact = getConventionalImpact(commit);
+    core.debug(`Commit ${commit.sha} title: ${commit.title}`);
+    core.debug(`Determined impact from commit: ${commit_impact ?? 'none'}`);
+    if (commit_impact !== undefined) {
+      commit_impacts.push(commit_impact);
+    }
+  }
+
+  const max_commit_impact =
+    commit_impacts.length > 0
+      ? (Math.max(...commit_impacts.map((c) => c.impact)) as Impact)
+      : Impact.NOIMPACT;
+  core.info(`Maximum impact from commits: ${String(max_commit_impact)}`);
+
+  let final_impact: ParsedCommitInfo | undefined = undefined;
+  if (max_commit_impact !== Impact.NOIMPACT) {
+    core.info(
+      `Using maximum commit impact (${Impact[max_commit_impact]}) for version bump.`,
+    );
+    const commit_impact = commit_impacts.find(
+      (c) => c.impact === max_commit_impact,
+    );
+    final_impact = commit_impact || undefined;
+  } else {
+    core.info(
+      'No conventional commit impacts found; no version bump will be performed.',
+    );
+  }
+
+  return {
+    prImpact: undefined,
+    commitImpacts: commit_impacts,
+    maxCommitImpact: max_commit_impact,
+    finalImpact: final_impact,
+  };
+}
+
 export async function write_job_summary(
   impactRes: ImpactResult,
   impact: Impact,
@@ -243,13 +289,24 @@ export async function run_github(
   const last_release_version = get_last_release_version(tag);
   core.info('Resolving pull request title...');
   const pr = await gh.getPrFromContextOrLatestCommit(token);
+  let commits: Commit[];
+  let impactRes: ImpactResult;
   if (!pr) {
-    core.setFailed('Could not find pull request in context.');
-    return;
+    core.info(
+      'No PR found; falling back to commits since last tag (direct push).',
+    );
+    if (!tag) {
+      core.info('No previous tag found; using all commits.');
+      commits = await git.getCommits('HEAD~100', 'HEAD');
+    } else {
+      commits = await gh.getCommitsSinceLastTag(tag.name);
+    }
+    impactRes = await getImpactFromCommits(commits);
+  } else {
+    core.info(`Found PR #${pr.number} title: ${pr.title}`);
+    commits = await gh.getPrCommits(token);
+    impactRes = await getImpactFromGithub(pr, commits);
   }
-  core.info(`Found PR #${pr.number} title: ${pr.title}`);
-  const commits = await gh.getPrCommits(token);
-  const impactRes = await getImpactFromGithub(pr, commits);
   if (
     !impactRes ||
     impactRes == undefined ||
@@ -259,17 +316,20 @@ export async function run_github(
     return;
   }
   const impact = impactRes.finalImpact.impact;
-  let prerelease = undefined;
-  let is_prerelease = pr.labels?.some(
-    (label) => label.name.toLowerCase() === 'release-candidate',
-  );
-  if (pr.merged) {
-    core.info('PR is merged; skipping release-candidate handling.');
-    is_prerelease = false;
+  let is_prerelease = false;
+  if (pr) {
+    is_prerelease =
+      pr.labels?.some(
+        (label) => label.name.toLowerCase() === 'release-candidate',
+      ) ?? false;
+    if (pr.merged) {
+      core.info('PR is merged; skipping release-candidate handling.');
+      is_prerelease = false;
+    }
   }
   // Compute the bumped base version first so we can reason about prereleases
   const bumped_base_version = last_release_version.bump(impact);
-  prerelease = undefined;
+  let prerelease = undefined;
   if (is_prerelease) {
     core.info('PR is marked as a release candidate.');
     const githubResults = await gh.getReleaseCandidates(
@@ -306,9 +366,9 @@ export async function run_github(
 
   core.info(`Final determined impact: ${String(impact)}`);
 
-  // Add PR label if requested
+  // Add PR label if requested (only when a PR is present)
   const shouldAddLabel = core.getBooleanInput('add-pr-label');
-  if (shouldAddLabel) {
+  if (shouldAddLabel && pr) {
     const useLabelPrefix = core.getBooleanInput('label-prefix');
     const labelPrefix = useLabelPrefix ? 'semVersie:' : '';
 
@@ -339,7 +399,9 @@ export async function run_github(
   }
   core.setOutput(
     'release',
-    (pr.merged && impact !== Impact.NOIMPACT) || prerelease !== undefined,
+    (pr ? pr.merged : true) && impact !== Impact.NOIMPACT
+      ? true
+      : prerelease !== undefined,
   );
 
   core.setOutput('release-notes-file', filePath);
