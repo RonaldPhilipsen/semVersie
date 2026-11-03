@@ -105,14 +105,16 @@ describe('getImpactFromGithub - concise scenarios', () => {
       );
     });
 
-    test('parsed release but no PR in context -> setFailed', async () => {
+    test('no PR (direct push) -> falls back to commits since last tag', async () => {
       const coreMock = {
         info: vi.fn(),
         debug: vi.fn(),
         warning: vi.fn(),
         error: vi.fn(),
         setFailed: vi.fn(),
-        getInput: vi.fn(),
+        getInput: vi.fn(() => ''),
+        getBooleanInput: vi.fn(() => false),
+        setOutput: vi.fn(),
         summary: {
           addHeading: vi.fn(() => ({
             addTable: vi.fn(() => ({ addRaw: vi.fn(), write: vi.fn() })),
@@ -124,25 +126,41 @@ describe('getImpactFromGithub - concise scenarios', () => {
       vi.resetModules();
       process.env.GITHUB_TOKEN = 'tok';
 
-      // mock github: latest release parsed, but PR missing
-      // mock github and patch core
-
       vi.doMock('../src/github.js', () => ({
         getLatestTag: async () => ({ name: 'v1.2.3' }),
         getPrFromContext: () => undefined,
-        getPrFromContextOrLatestCommit: () => undefined,
+        getPrFromContextOrLatestCommit: async () => undefined,
         getPrCommits: async () => [],
+        getCommitsSinceLastTag: async () => [
+          { sha: 'abc1234', title: 'fix: something broke', body: undefined },
+        ],
         getReleaseCandidatesSinceLatestRelease: async () => [],
         getReleaseCandidates: async () => [],
         getFileContent: async () => undefined,
+        ensureImpactLabels: async () => {},
+        addImpactLabelToPr: async () => {},
+      }));
+
+      vi.doMock('../src/conventional_commits.js', () => ({
+        getConventionalImpact: (obj: any) => {
+          if (obj.title?.startsWith('fix:')) {
+            return { type: 'fix', impact: 1 };
+          }
+          return undefined;
+        },
+        ParseConventionalTitle: () => undefined,
+        ParseConventionalBody: () => undefined,
+        TypeToImpactMapping: {},
       }));
 
       vi.doMock('@actions/core', () => coreMock);
       const mod = await import('../src/main.js');
       await mod.run();
-      expect(coreMock.setFailed).toHaveBeenCalledWith(
-        'Could not find pull request in context.',
-      );
+
+      expect(coreMock.setFailed).not.toHaveBeenCalled();
+      expect(coreMock.setOutput).toHaveBeenCalledWith('release', true);
+      expect(coreMock.setOutput).toHaveBeenCalledWith('tag', 'v1.2.4');
+      expect(coreMock.setOutput).toHaveBeenCalledWith('version', '1.2.4');
     });
 
     test('happy path -> outputs tag and version', async () => {

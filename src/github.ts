@@ -335,6 +335,23 @@ export async function getPrCommits(token: string): Promise<Commit[]> {
 }
 
 /**
+ * Return commits since the last tag using local git. Used as a fallback
+ * when no PR is associated with the push (direct push to main).
+ */
+export async function getCommitsSinceLastTag(
+  lastTagName: string,
+): Promise<Commit[]> {
+  try {
+    const commits = await git.getCommits(lastTagName, 'HEAD');
+    core.info(`Found ${commits.length} commits since last tag ${lastTagName}`);
+    return commits;
+  } catch (err) {
+    core.debug(`getCommitsSinceLastTag failed: ${String(err)}`);
+    return [];
+  }
+}
+
+/**
  * Return the most recent tag name for the repository in the Actions context using GitHub API.
  * Returns undefined if the API call fails.
  */
