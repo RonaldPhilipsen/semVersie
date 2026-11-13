@@ -33,6 +33,15 @@ export class LRUCache<V> {
 }
 
 /**
+ * True when the tag parses as a version with a prerelease part, such as
+ * v1.2.0-rc0. A prerelease tag is never the last release: bumping from it
+ * would skip the version that the prerelease was a candidate for.
+ */
+export function isPrereleaseTag(name: string): boolean {
+  return SemanticVersion.parse(name)?.prerelease !== undefined;
+}
+
+/**
  * Filter RC tags based on baseline version comparison.
  * This is a shared utility function used by both local git and GitHub API functions.
  */

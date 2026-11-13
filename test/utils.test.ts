@@ -1,4 +1,4 @@
-import { LRUCache } from '../src/utils.js';
+import { LRUCache, isPrereleaseTag } from '../src/utils.js';
 
 describe('LRUCache', () => {
   test('set/get and eviction order', () => {
@@ -106,5 +106,15 @@ describe('LRUCache', () => {
     // deleting a non-existent key should not throw
     c.delete('nope');
     expect(c.get('nope')).toBeUndefined();
+  });
+});
+
+describe('isPrereleaseTag', () => {
+  test('detects prerelease versions', () => {
+    expect(isPrereleaseTag('v1.2.0-rc0')).toBe(true);
+    expect(isPrereleaseTag('1.2.0-rc.1')).toBe(true);
+    expect(isPrereleaseTag('v1.2.0')).toBe(false);
+    expect(isPrereleaseTag('v1.2.0+build.5')).toBe(false);
+    expect(isPrereleaseTag('not-a-version')).toBe(false);
   });
 });
