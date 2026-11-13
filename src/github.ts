@@ -2,7 +2,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { readFile, access } from 'fs/promises';
 import { constants } from 'fs';
-import { LRUCache, filterRCTagsByBaseline } from './utils.js';
+import { LRUCache, filterRCTagsByBaseline, isPrereleaseTag } from './utils.js';
 import * as git from './git.js';
 import { SemanticVersion } from './semver.js';
 import type { Commit, Tag } from './git.js';
@@ -352,8 +352,38 @@ export async function getCommitsSinceLastTag(
 }
 
 /**
- * Return the most recent tag name for the repository in the Actions context using GitHub API.
- * Returns undefined if the API call fails.
+ * GitHub lists tags newest version first. Walk the pages until the first tag
+ * that is not a prerelease.
+ */
+async function getLatestReleaseTagName(
+  octokit: ReturnType<typeof github.getOctokit>,
+  owner: string,
+  repo: string,
+): Promise<string | undefined> {
+  const per_page = 100;
+  for (let page = 1; ; page++) {
+    const res = await octokit.rest.repos.listTags({
+      owner,
+      repo,
+      per_page,
+      page,
+    });
+    const tags = Array.isArray(res?.data) ? res.data : [];
+    for (const t of tags) {
+      if (!t.name) continue;
+      if (isPrereleaseTag(t.name)) {
+        core.debug(`getLatestTag: skipping prerelease tag ${t.name}`);
+        continue;
+      }
+      return t.name;
+    }
+    if (tags.length < per_page) return undefined;
+  }
+}
+
+/**
+ * Return the latest release tag for the repository in the Actions context using GitHub API.
+ * Prerelease tags are skipped. Returns undefined if the API call fails.
  */
 export async function getLatestTag(token: string): Promise<Tag | undefined> {
   try {
@@ -362,14 +392,8 @@ export async function getLatestTag(token: string): Promise<Tag | undefined> {
     let p = GH_CACHE.get(cacheKey) as Promise<Tag | undefined> | undefined;
     if (!p) {
       const raw = (async (): Promise<Tag | undefined> => {
-        const res = await octokit.rest.repos.listTags({
-          owner,
-          repo,
-          per_page: 1,
-        });
-        const t = res.data && res.data[0] ? res.data[0] : undefined;
-        if (!t || !t.name) return undefined;
-        const name = t.name;
+        const name = await getLatestReleaseTagName(octokit, owner, repo);
+        if (!name) return undefined;
 
         // First try annotated tag resolution, then fallback to lightweight commit-based tag
         const annotated = await getLatestAnnotatedTag(token, name);

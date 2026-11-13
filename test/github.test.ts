@@ -109,6 +109,89 @@ describe('github module', () => {
 
   // getLatestRelease removed: behavior tested indirectly via getLatestTag and other helpers
 
+  test('getLatestTag skips prerelease tags, across pages', async () => {
+    const pages: Record<number, { name: string }[]> = {
+      1: Array.from({ length: 100 }, (_, i) => ({ name: `v2.0.0-rc${i}` })),
+      2: [{ name: 'v1.4.0-rc1' }, { name: 'v1.3.2' }, { name: 'v1.3.1' }],
+    };
+    const octokit = {
+      rest: {
+        repos: {
+          listTags: async ({ page }: { page: number }) => ({
+            data: pages[page] ?? [],
+          }),
+        },
+        git: {
+          getRef: async () => ({
+            data: { object: { sha: 'c', type: 'commit' } },
+          }),
+        },
+      },
+    };
+    vi.doMock('@actions/github', () => ({
+      context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
+      getOctokit: () => octokit,
+    }));
+    vi.doMock('@actions/core', () => ({ debug: () => {}, info: () => {} }));
+    const mod = await import('../src/github.js');
+    const res = await mod.getLatestTag('tok');
+    expect(res?.name).toBe('v1.3.2');
+  });
+
+  test('rc tags set the next rc number but not the last release', async () => {
+    const tags = [
+      { name: 'v0.5.0-rc1' },
+      { name: 'v0.5.0-rc0' },
+      { name: 'v0.4.9' },
+    ];
+    const octokit = {
+      rest: {
+        repos: { listTags: async () => ({ data: tags }) },
+        git: {
+          getRef: async () => ({
+            data: { object: { sha: 'c', type: 'commit' } },
+          }),
+        },
+      },
+    };
+    vi.doMock('@actions/github', () => ({
+      context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
+      getOctokit: () => octokit,
+    }));
+    vi.doMock('@actions/core', () => ({ debug: () => {}, info: () => {} }));
+    const mod = await import('../src/github.js');
+    const { SemanticVersion, Impact } = await import('../src/semver.js');
+
+    const last = SemanticVersion.parse((await mod.getLatestTag('tok'))!.name)!;
+    expect(last.toString()).toBe('0.4.9');
+    const base = last.bump(Impact.MINOR);
+    expect(base.toString()).toBe('0.5.0');
+
+    const rcs = await mod.getReleaseCandidates('tok', base);
+    const next = SemanticVersion.nextRcIndex(
+      base,
+      rcs.map((r) => r.name),
+    );
+    expect(next).toBe(2);
+  });
+
+  test('getLatestTag returns undefined when every tag is a prerelease', async () => {
+    const octokit = {
+      rest: {
+        repos: {
+          listTags: async () => ({ data: [{ name: 'v0.1.0-rc0' }] }),
+        },
+      },
+    };
+    vi.doMock('@actions/github', () => ({
+      context: { repo: { owner: 'o', repo: 'r' }, payload: {} },
+      getOctokit: () => octokit,
+    }));
+    vi.doMock('@actions/core', () => ({ debug: () => {}, info: () => {} }));
+    const mod = await import('../src/github.js');
+    expect(await mod.getLatestTag('tok')).toBeUndefined();
+  });
+
   test('getPrCommits dedupes concurrent calls and caches failures cleanup', async () => {
     const calls: string[] = [];
     const commits = [

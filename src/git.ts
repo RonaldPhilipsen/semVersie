@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import { spawn } from 'child_process';
 import { SemanticVersion } from './semver.js';
-import { filterRCTagsByBaseline } from './utils.js';
+import { filterRCTagsByBaseline, isPrereleaseTag } from './utils.js';
 
 export type Commit = { sha: string; title: string; body?: string };
 
@@ -54,14 +54,14 @@ export async function execGitCommand(
 }
 
 /**
- * Get the latest tag from local git repository
+ * Get the latest release tag from local git repository. Prerelease tags are skipped.
  */
 export async function getLatestTag(): Promise<Tag | undefined> {
   try {
-    // Get all tags and return the first one (most recent due to sorting)
+    // getTags sorts by version, newest first.
     const allTags = await getTags();
-    if (allTags.length > 0) {
-      const latestTag = allTags[0];
+    const latestTag = allTags.find((t) => !isPrereleaseTag(t.name));
+    if (latestTag) {
       core.info(`Found latest tag from local git: ${latestTag.name}`);
       return latestTag;
     }
