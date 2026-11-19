@@ -42,9 +42,9 @@
     "@eslint/js": "10.0.1",
     "@ronaldphilipsen/local-action": "7.2.14",
     "@types/node": "26.6.6",
-    "@typescript-eslint/eslint-plugin": "8.72.2",
-    "@typescript-eslint/parser": "8.72.2",
-    "@vitest/coverage-v8": "5.1.0",
+    "@typescript-eslint/eslint-plugin": "8.73.0",
+    "@typescript-eslint/parser": "8.73.0",
+    "@vitest/coverage-v8": "5.1.1",
     "@vitest/eslint-plugin": "1.6.28",
     "eslint": "10.15.0",
     "eslint-config-prettier": "10.1.8",
@@ -56,6 +56,6 @@
     "tsdown": "0.23.7",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vitest": "5.1.0"
+    "vitest": "5.1.1"
   }
 }
