@@ -44,7 +44,7 @@
     "@types/node": "26.6.10",
     "@typescript-eslint/eslint-plugin": "8.74.0",
     "@typescript-eslint/parser": "8.74.0",
-    "@vitest/coverage-v8": "5.1.1",
+    "@vitest/coverage-v8": "5.1.2",
     "@vitest/eslint-plugin": "1.6.28",
     "eslint": "10.15.0",
     "eslint-config-prettier": "10.1.8",
@@ -56,6 +56,6 @@
     "tsdown": "0.23.7",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vitest": "5.1.1"
+    "vitest": "5.1.2"
   }
 }
